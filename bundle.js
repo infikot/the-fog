@@ -771,10 +771,13 @@ questBtnBackHub.addEventListener("click", () => {
   sounds.playButton();
   engine.returnToHub();
 });
+var hubSoundIcon = document.getElementById("hub-sound-icon");
+var questSoundIcon = document.getElementById("quest-sound-icon");
 var toggleSound = () => {
   const active = sounds.toggle();
-  hubBtnSound.textContent = active ? "\u{1F50A}" : "\u{1F507}";
-  questBtnSound.textContent = active ? "\u{1F50A}" : "\u{1F507}";
+  const iconName = active ? "volume_up" : "volume_off";
+  if (hubSoundIcon) hubSoundIcon.textContent = iconName;
+  if (questSoundIcon) questSoundIcon.textContent = iconName;
 };
 hubBtnSound.addEventListener("click", toggleSound);
 questBtnSound.addEventListener("click", toggleSound);
