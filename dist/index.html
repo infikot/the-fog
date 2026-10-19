@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>ТУМАН</title>
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="./assets/index-BHp8T7D4.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CpCifbbs.css">
+  </head>
+  <body>
+    <!-- Background Layer -->
+    <div id="game-bg" style="position:fixed;inset:0;background-size:cover;background-position:center;transition:background-image 0.8s ease;z-index:0;opacity:0.38;pointer-events:none;"></div>
+    <div style="position:fixed;inset:0;background:linear-gradient(to top, #0b0d10 0%, rgba(11,13,16,0.85) 50%, rgba(11,13,16,0.6) 100%);z-index:0;pointer-events:none;"></div>
+
+    <!-- Header -->
+    <header class="fog-header">
+      <div style="display:flex;align-items:center;">
+        <span class="fog-title">ТУМАН</span>
+        <span id="status-indicator" class="fog-badge">Назарет</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <button id="sound-toggle" class="fog-btn-icon" title="Звук">🔊</button>
+        <button id="menu-toggle" class="fog-btn-menu">Меню</button>
+      </div>
+    </header>
+
+    <!-- Main Quest Story Log -->
+    <main class="fog-main">
+      <div id="log-container">
+        <!-- Lines injected dynamically -->
+      </div>
+    </main>
+
+    <!-- Footer Controls -->
+    <footer class="fog-footer">
+      <div class="fog-footer-inner" id="controls-container">
+        <!-- Choices / Next Step buttons -->
+      </div>
+    </footer>
+
+    <!-- Save/Load Modal Dialog -->
+    <div id="modal-menu" class="fog-modal-backdrop" style="display:none;">
+      <div class="fog-modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-fog-border);padding-bottom:0.75rem;margin-bottom:0.75rem;">
+          <span class="fog-modal-title">Сохранения</span>
+          <button id="close-menu" style="background:none;border:none;color:var(--color-fog-muted);font-size:1.1rem;cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:0.78rem;color:var(--color-fog-muted);line-height:1.5;margin-bottom:0.75rem;">
+          Прогресс непрерывно сохраняется в локальной базе браузера (IndexedDB/localStorage).
+        </p>
+        <div style="display:flex;flex-direction:column;gap:0.25rem;">
+          <button id="btn-export" class="fog-modal-btn">
+            <span>Экспорт сохранения (JSON)</span>
+            <span>💾</span>
+          </button>
+          <button id="btn-import" class="fog-modal-btn">
+            <span>Импорт сохранения</span>
+            <span>📂</span>
+          </button>
+          <input type="file" id="file-input" accept=".json" style="display:none;" />
+          <button id="btn-restart" class="fog-modal-btn" style="color:#f87171;border-color:rgba(239,68,68,0.3);margin-top:0.75rem;">
+            <span>Начать заново</span>
+            <span>⚠️</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>
