@@ -1,0 +1,44 @@
+{
+  "nazareth": {
+    "id": "nazareth",
+    "title": "Назарет",
+    "stories": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+    ],
+    "lastStory": "6",
+    "nextEpisode": "virsavia"
+  },
+  "virsavia": {
+    "id": "virsavia",
+    "title": "Вирсавия",
+    "stories": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "lastStory": "5",
+    "nextEpisode": "gilgal"
+  },
+  "gilgal": {
+    "id": "gilgal",
+    "title": "Гилгал",
+    "stories": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "lastStory": "4",
+    "nextEpisode": null
+  }
+}
