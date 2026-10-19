@@ -1,14 +1,15 @@
 import { GameState } from './types';
 
-const STORAGE_KEY = 'thefog_save_state_v1';
-const DB_NAME = 'TheFogDatabase';
-const STORE_NAME = 'saves';
+const STORAGE_KEY = 'thefog_save_session_v2';
+const DB_NAME = 'TheFogSessionDB';
+const STORE_NAME = 'session';
 
 export function getDefaultState(): GameState {
   return {
+    currentScreen: 'menu',
     currentEpisode: 'nazareth',
     currentStory: '0',
-    currentQuestId: '0',
+    currentQuestId: null,
     currentLineId: 'Line_0',
     completedQuests: [],
     completedEpisodes: [],
@@ -19,8 +20,12 @@ export function getDefaultState(): GameState {
       first: 0,
       second: 0,
     },
+    visitedLines: {},
+    choiceHistory: [],
     history: [],
     currentBackground: 'Backgrounds/1',
+    hasStartedSession: false,
+    gameFinished: false,
   };
 }
 
@@ -39,11 +44,16 @@ export function loadStateFromLocal(): GameState {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (!parsed.points) {
-        parsed.points = { value_0: 0, value_1: 0 };
+        parsed.points = { value_0: 0, value_1: 0, first: 0, second: 0 };
       }
       if (parsed.points.value_0 === undefined) parsed.points.value_0 = parsed.points.first || 0;
       if (parsed.points.value_1 === undefined) parsed.points.value_1 = parsed.points.second || 0;
       if (!parsed.inventory) parsed.inventory = {};
+      if (!parsed.visitedLines) parsed.visitedLines = {};
+      if (!parsed.choiceHistory) parsed.choiceHistory = [];
+      if (!parsed.currentScreen) {
+        parsed.currentScreen = parsed.hasStartedSession ? (parsed.currentQuestId ? 'quest' : 'story_hub') : 'menu';
+      }
       return parsed;
     }
   } catch (e) {
@@ -54,7 +64,7 @@ export function loadStateFromLocal(): GameState {
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -71,7 +81,7 @@ export async function saveStateToIDB(state: GameState): Promise<void> {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    store.put({ id: 'current', data: state, updatedAt: Date.now() });
+    store.put({ id: 'active_session', data: state, updatedAt: Date.now() });
   } catch (e) {
     // Non-critical fallback
   }
@@ -83,7 +93,7 @@ export async function loadStateFromIDB(): Promise<GameState | null> {
     return new Promise((resolve) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.get('current');
+      const req = store.get('active_session');
       req.onsuccess = () => {
         if (req.result && req.result.data) {
           resolve(req.result.data);
@@ -99,16 +109,47 @@ export async function loadStateFromIDB(): Promise<GameState | null> {
 }
 
 export function exportSaveJSON(state: GameState): string {
-  return JSON.stringify(state, null, 2);
+  // Session payload with rich history of choices & branch track
+  const exportPayload = {
+    version: 2,
+    exportTimestamp: Date.now(),
+    currentScreen: state.currentScreen,
+    currentEpisode: state.currentEpisode,
+    currentStory: state.currentStory,
+    currentQuestId: state.currentQuestId,
+    currentLineId: state.currentLineId,
+    points: state.points,
+    inventory: state.inventory,
+    completedQuests: state.completedQuests,
+    completedEpisodes: state.completedEpisodes,
+    visitedLinesCount: Object.keys(state.visitedLines || {}).length,
+    choiceHistory: state.choiceHistory || [],
+    visitedLines: state.visitedLines || {},
+    hasStartedSession: state.hasStartedSession,
+    currentBackground: state.currentBackground,
+  };
+  return JSON.stringify(exportPayload, null, 2);
 }
 
 export function importSaveJSON(jsonStr: string): GameState | null {
   try {
     const parsed = JSON.parse(jsonStr);
-    if (parsed && parsed.currentEpisode && parsed.currentStory) {
-      if (!parsed.points) parsed.points = { value_0: 0, value_1: 0 };
-      if (!parsed.inventory) parsed.inventory = {};
-      return parsed;
+    if (parsed && (parsed.currentEpisode || parsed.version)) {
+      const state = getDefaultState();
+      state.currentScreen = parsed.currentScreen || 'story_hub';
+      state.currentEpisode = parsed.currentEpisode || 'nazareth';
+      state.currentStory = parsed.currentStory || '0';
+      state.currentQuestId = parsed.currentQuestId ?? null;
+      state.currentLineId = parsed.currentLineId || 'Line_0';
+      state.points = parsed.points || { value_0: 0, value_1: 0, first: 0, second: 0 };
+      state.inventory = parsed.inventory || {};
+      state.completedQuests = parsed.completedQuests || [];
+      state.completedEpisodes = parsed.completedEpisodes || [];
+      state.visitedLines = parsed.visitedLines || {};
+      state.choiceHistory = parsed.choiceHistory || [];
+      state.hasStartedSession = true;
+      state.currentBackground = parsed.currentBackground || 'Backgrounds/1';
+      return state;
     }
   } catch (e) {
     console.error('Invalid save JSON:', e);

@@ -1,61 +1,236 @@
-import "./style.css";
-import { loadStateFromLocal, exportSaveJSON, importSaveJSON } from './storage';
 import { FogEngine } from './engine';
-import { sounds } from './sound';
+import { loadStateFromLocal, exportSaveJSON, importSaveJSON } from './storage';
+import { SoundManager } from './sounds';
+import { GameState } from './types';
+import './style.css';
 
-const bgElement = document.getElementById('game-bg') as HTMLDivElement;
-const logContainer = document.getElementById('log-container') as HTMLDivElement;
-const controlsContainer = document.getElementById('controls-container') as HTMLDivElement;
-const epBtn = document.getElementById('ep-btn') as HTMLButtonElement;
-const soundToggle = document.getElementById('sound-toggle') as HTMLButtonElement;
-const menuToggle = document.getElementById('menu-toggle') as HTMLButtonElement;
-const invToggle = document.getElementById('inv-toggle') as HTMLButtonElement;
-const modalMenu = document.getElementById('modal-menu') as HTMLDivElement;
-const modalInventory = document.getElementById('modal-inventory') as HTMLDivElement;
-const modalEpisodes = document.getElementById('modal-episodes') as HTMLDivElement;
-const closeMenu = document.getElementById('close-menu') as HTMLButtonElement;
+// DOM Elements
+const screenMenu = document.getElementById('screen-menu') as HTMLElement;
+const screenHub = document.getElementById('screen-hub') as HTMLElement;
+const screenQuest = document.getElementById('screen-quest') as HTMLElement;
+
+// Background
+const gameBg = document.getElementById('game-bg') as HTMLElement;
+
+// Menu buttons
+const menuBtnStart = document.getElementById('menu-btn-start') as HTMLButtonElement;
+const menuBtnContinue = document.getElementById('menu-btn-continue') as HTMLButtonElement;
+const menuBtnSettings = document.getElementById('menu-btn-settings') as HTMLButtonElement;
+
+// Hub Elements
+const hubEpTitle = document.getElementById('hub-ep-title') as HTMLElement;
+const hubStoryTitle = document.getElementById('hub-story-title') as HTMLElement;
+const hubCardImg = document.getElementById('hub-card-img') as HTMLImageElement;
+const hubCardTitle = document.getElementById('hub-card-title') as HTMLElement;
+const hubCardDesc = document.getElementById('hub-card-desc') as HTMLElement;
+const hubCardStatus = document.getElementById('hub-card-status') as HTMLElement;
+const hubBtnPrev = document.getElementById('hub-btn-prev') as HTMLButtonElement;
+const hubBtnNext = document.getElementById('hub-btn-next') as HTMLButtonElement;
+const hubBtnStartQuest = document.getElementById('hub-btn-start-quest') as HTMLButtonElement;
+const hubAdvanceBox = document.getElementById('hub-advance-box') as HTMLElement;
+const hubBtnAdvanceStory = document.getElementById('hub-btn-advance-story') as HTMLButtonElement;
+const hubBtnMenu = document.getElementById('hub-btn-menu') as HTMLButtonElement;
+const hubBtnInv = document.getElementById('hub-btn-inv') as HTMLButtonElement;
+const hubBtnSound = document.getElementById('hub-btn-sound') as HTMLButtonElement;
+
+// Quest Elements
+const questBtnBackHub = document.getElementById('quest-btn-back-hub') as HTMLButtonElement;
+const questBtnInv = document.getElementById('quest-btn-inv') as HTMLButtonElement;
+const questBtnSound = document.getElementById('quest-btn-sound') as HTMLButtonElement;
+const logContainer = document.getElementById('log-container') as HTMLElement;
+const controlsContainer = document.getElementById('controls-container') as HTMLElement;
+const pointsRedVal = document.getElementById('points-red-val') as HTMLElement;
+const pointsBlueVal = document.getElementById('points-blue-val') as HTMLElement;
+
+// Modals
+const modalInventory = document.getElementById('modal-inventory') as HTMLElement;
+const modalSettings = document.getElementById('modal-settings') as HTMLElement;
 const closeInventory = document.getElementById('close-inventory') as HTMLButtonElement;
-const closeEpisodes = document.getElementById('close-episodes') as HTMLButtonElement;
-const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement;
+const closeSettings = document.getElementById('close-settings') as HTMLButtonElement;
+const inventoryList = document.getElementById('inventory-list') as HTMLElement;
 const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
 const btnImport = document.getElementById('btn-import') as HTMLButtonElement;
+const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 
-const pointsRedVal = document.getElementById('points-red-val') as HTMLSpanElement;
-const pointsBlueVal = document.getElementById('points-blue-val') as HTMLSpanElement;
-const inventoryList = document.getElementById('inventory-list') as HTMLDivElement;
-const episodesList = document.getElementById('episodes-list') as HTMLDivElement;
+// State & Engines
+let currentCarouselIndex = 0;
+let hubQuestsList: Array<{ id: string; name: string; desc: string; cards: string[]; isDone: boolean }> = [];
 
-let engine: FogEngine;
+const sounds = new SoundManager();
+const initialState = loadStateFromLocal();
 
-function updateBackground(bgPath: string) {
-  if (!bgPath) return;
-  const normalized = bgPath.toLowerCase().replace(/^backgrounds\//i, '');
-  bgElement.style.backgroundImage = `url(./assets/backgrounds/${normalized}.webp)`;
-}
+const engine = new FogEngine(
+  initialState,
+  (state) => {
+    updateView(state);
+  },
+  (text, isChoice, pointChange) => {
+    appendLogMessage(text, isChoice, pointChange);
+  }
+);
 
-function updatePointsUI() {
+// Init Application
+(async () => {
+  await engine.init();
   const state = engine.getState();
-  const red = state.points?.value_0 || 0;
-  const blue = state.points?.value_1 || 0;
-  pointsRedVal.textContent = red.toString();
-  pointsBlueVal.textContent = blue.toString();
+  updateView(state);
+})();
+
+// Global View Switcher
+function updateView(state: GameState): void {
+  updateBackground(state.currentBackground);
+  updatePoints(state);
+
+  // Toggle screens
+  screenMenu.style.display = state.currentScreen === 'menu' ? 'flex' : 'none';
+  screenHub.style.display = state.currentScreen === 'story_hub' ? 'flex' : 'none';
+  screenQuest.style.display = state.currentScreen === 'quest' ? 'flex' : 'none';
+
+  // Menu Continue button visibility
+  if (state.hasStartedSession) {
+    menuBtnContinue.style.display = 'block';
+  } else {
+    menuBtnContinue.style.display = 'none';
+  }
+
+  if (state.currentScreen === 'story_hub') {
+    renderHub(state);
+  } else if (state.currentScreen === 'quest') {
+    renderQuest(state);
+  }
 }
 
-function appendLogMessage(text: string, isChoice = false, pointChange?: { red?: number; blue?: number }) {
+function updateBackground(bgPath: string): void {
+  if (!bgPath) return;
+  const clean = bgPath.replace(/^Backgrounds\//, '').replace(/\.(png|jpg|webp)$/i, '');
+  const url = `./assets/backgrounds/${clean}.webp`;
+  gameBg.style.backgroundImage = `url('${url}')`;
+}
+
+function updatePoints(state: GameState): void {
+  if (pointsRedVal) pointsRedVal.textContent = String(state.points.value_0 || 0);
+  if (pointsBlueVal) pointsBlueVal.textContent = String(state.points.value_1 || 0);
+}
+
+// ========================================================
+// 1. HUB RENDERING (Original Carousel of Quests & Cards)
+// ========================================================
+function renderHub(state: GameState): void {
+  const epNames: Record<string, string> = {
+    nazareth: 'НАЗАРЕТ',
+    virsavia: 'ВИРСАВИЯ',
+    gilgal: 'ГАЛГАЛ',
+  };
+  hubEpTitle.textContent = epNames[state.currentEpisode] || state.currentEpisode.toUpperCase();
+  hubStoryTitle.textContent = `Глава ${state.currentStory}`;
+
+  hubQuestsList = engine.getAvailableQuests();
+  if (hubQuestsList.length === 0) return;
+
+  if (currentCarouselIndex >= hubQuestsList.length) {
+    currentCarouselIndex = 0;
+  }
+
+  const currentQ = hubQuestsList[currentCarouselIndex];
+  hubCardTitle.textContent = currentQ.name;
+  hubCardDesc.textContent = currentQ.desc || 'Продолжить исследование локации...';
+  hubCardStatus.textContent = currentQ.isDone ? 'Исследовано' : 'Доступно';
+  hubCardStatus.style.color = currentQ.isDone ? 'var(--color-fog-muted)' : 'var(--color-fog-gold)';
+
+  // First card image or default
+  let cardImgPath = './assets/backgrounds/1.webp';
+  if (currentQ.cards && currentQ.cards.length > 0) {
+    const rawCard = currentQ.cards[0].replace(/^Cards\//, '').replace(/\.(png|jpg|webp)$/i, '');
+    cardImgPath = `./assets/cards/${rawCard}.webp`;
+  }
+  hubCardImg.src = cardImgPath;
+
+  // Nav buttons
+  hubBtnPrev.disabled = currentCarouselIndex === 0;
+  hubBtnNext.disabled = currentCarouselIndex >= hubQuestsList.length - 1;
+
+  // Check if all quests in this story are completed
+  const allStoryDone = hubQuestsList.every((q) => q.isDone);
+  if (allStoryDone) {
+    hubAdvanceBox.style.display = 'block';
+  } else {
+    hubAdvanceBox.style.display = 'none';
+  }
+}
+
+// ========================================================
+// 2. QUEST RENDERING (Story Log & Decisions)
+// ========================================================
+function renderQuest(state: GameState): void {
+  controlsContainer.innerHTML = '';
+  const currentLine = engine.getCurrentLine();
+
+  if (!currentLine) {
+    // End of quest: Return button
+    const btn = document.createElement('button');
+    btn.className = 'fog-btn-action';
+    btn.innerHTML = `<span>Завершить исследование</span><span>➔</span>`;
+    btn.addEventListener('click', () => {
+      sounds.playButton();
+      engine.finishCurrentQuest();
+    });
+    controlsContainer.appendChild(btn);
+    return;
+  }
+
+  const comps = Object.values(currentLine.components);
+
+  // A) Choices
+  const choiceComp = comps.find((c) => c.type === 'line_choose' && c.items);
+  if (choiceComp && choiceComp.items) {
+    for (const [key, item] of Object.entries(choiceComp.items)) {
+      const choiceBtn = document.createElement('button');
+      choiceBtn.className = 'fog-choice-btn animate-fade-in';
+      const commonRu = engine.getCommonRu();
+      const choiceText = commonRu[item.text]?.text || item.text || `Вариант ${key}`;
+      choiceBtn.textContent = choiceText;
+
+      choiceBtn.addEventListener('click', () => {
+        sounds.playButton();
+        engine.choose(item.line, choiceText);
+      });
+      controlsContainer.appendChild(choiceBtn);
+    }
+    return;
+  }
+
+  // B) Step / Continue Button
+  const hasNext = comps.some(
+    (c) => c.type === 'line_next' || c.type === 'line_next_points' || c.type === 'line_next_item' || c.type === 'line_to_quests'
+  );
+
+  if (hasNext) {
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'fog-btn-action animate-fade-in';
+    nextBtn.innerHTML = `<span>Продолжить</span><span>➔</span>`;
+    nextBtn.addEventListener('click', () => {
+      sounds.playButton();
+      engine.step();
+    });
+    controlsContainer.appendChild(nextBtn);
+  }
+}
+
+function appendLogMessage(text: string, isChoice = false, pointChange?: { red?: number; blue?: number }): void {
   const container = document.createElement('div');
   container.className = isChoice ? 'story-choice-echo animate-fade-in' : 'story-line animate-fade-in';
-  container.innerHTML = text.replace(/\n/g, '<br/>');
+  container.textContent = text;
 
   if (pointChange) {
-    if (pointChange.red && pointChange.red !== 0) {
-      const b = document.createElement('span');
-      b.className = 'point-badge-change red';
-      b.textContent = `${pointChange.red > 0 ? '+' : ''}${pointChange.red} Сила`;
+    if (pointChange.red) {
+      const r = document.createElement('span');
+      r.className = 'point-badge-change red';
+      r.textContent = `${pointChange.red > 0 ? '+' : ''}${pointChange.red} Сила`;
       container.appendChild(document.createElement('br'));
-      container.appendChild(b);
+      container.appendChild(r);
     }
-    if (pointChange.blue && pointChange.blue !== 0) {
+    if (pointChange.blue) {
       const b = document.createElement('span');
       b.className = 'point-badge-change blue';
       b.textContent = `${pointChange.blue > 0 ? '+' : ''}${pointChange.blue} Рассудок`;
@@ -72,326 +247,165 @@ function appendLogMessage(text: string, isChoice = false, pointChange?: { red?: 
   });
 }
 
-function renderControls() {
-  controlsContainer.innerHTML = '';
-  updatePointsUI();
+// ========================================================
+// 3. LISTENERS & CONTROLS
+// ========================================================
 
-  const state = engine.getState();
-  const currentLine = engine.getCurrentLine();
+// Main Menu
+menuBtnStart.addEventListener('click', () => {
+  sounds.playButton();
+  sounds.playAmbient();
+  engine.startNewGame();
+});
 
-  const epNames: Record<string, string> = {
-    nazareth: 'Назарет',
-    virsavia: 'Вирсавия',
-    gilgal: 'Галгал',
-  };
-  epBtn.textContent = epNames[state.currentEpisode] || state.currentEpisode;
+menuBtnContinue.addEventListener('click', () => {
+  sounds.playButton();
+  sounds.playAmbient();
+  engine.continueGame();
+});
 
-  if (state.gameFinished) {
-    controlsContainer.innerHTML = `
-      <div style="text-align:center;padding:1.5rem;background:var(--color-fog-surface);border:1px solid var(--color-fog-border);border-radius:8px;">
-        <h2 style="font-family:var(--font-serif);color:var(--color-fog-gold);font-size:1.4rem;margin-bottom:0.5rem;">ФИНАЛ</h2>
-        <p style="color:var(--color-fog-muted);font-size:0.85rem;margin-bottom:1rem;">Вы прошли сквозь все испытания Тумана.</p>
-        <button id="btn-final-restart" class="fog-btn-action">Начать сначала</button>
-      </div>
-    `;
-    document.getElementById('btn-final-restart')?.addEventListener('click', () => {
-      engine.restartGame();
-    });
-    return;
+menuBtnSettings.addEventListener('click', () => {
+  sounds.playButton();
+  modalSettings.style.display = 'flex';
+});
+
+// Hub Controls
+hubBtnPrev.addEventListener('click', () => {
+  sounds.playButton();
+  if (currentCarouselIndex > 0) {
+    currentCarouselIndex--;
+    renderHub(engine.getState());
   }
+});
 
-  // If no active quest: Show quest hub + Next Story Button!
-  if (!state.currentQuestId) {
-    const quests = engine.getAvailableQuests();
-    const allDone = quests.length > 0 && quests.every((q) => q.isDone);
-
-    const title = document.createElement('div');
-    title.style.cssText = 'font-size:0.75rem;text-transform:uppercase;letter-spacing:0.15em;color:var(--color-fog-muted);margin-bottom:0.75rem;font-weight:600;display:flex;justify-content:space-between;align-items:center;';
-    title.innerHTML = `
-      <span>Локации: Глава ${state.currentStory}</span>
-      <span style="color:var(--color-fog-gold);">${allDone ? 'Ветка пройдена' : ''}</span>
-    `;
-    controlsContainer.appendChild(title);
-
-    // If all quests in this story are completed: Show prominent "Продолжить путь" button!
-    if (allDone) {
-      const nextStoryBtn = document.createElement('button');
-      nextStoryBtn.className = 'fog-btn-action';
-      nextStoryBtn.style.marginBottom = '0.75rem';
-      nextStoryBtn.innerHTML = `
-        <span>Продолжить путь (Следующая глава)</span>
-        <span style="font-size:1rem;">➔</span>
-      `;
-      nextStoryBtn.addEventListener('click', () => {
-        sounds.playAmbient();
-        engine.advanceToNextStory();
-      });
-      controlsContainer.appendChild(nextStoryBtn);
-    }
-
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:0.75rem;';
-
-    for (const q of quests) {
-      const card = document.createElement('button');
-      card.style.cssText = `
-        padding: 1rem;
-        text-align: left;
-        border-radius: 6px;
-        border: 1px solid ${q.isDone ? 'rgba(35,42,53,0.4)' : 'var(--color-fog-border)'};
-        background: ${q.isDone ? 'rgba(20,24,31,0.4)' : 'var(--color-fog-surface)'};
-        opacity: ${q.isDone ? '0.6' : '1'};
-        cursor: pointer;
-        transition: all 0.2s ease;
-      `;
-
-      card.innerHTML = `
-        <div style="color:var(--color-fog-gold);font-weight:600;font-size:0.95rem;margin-bottom:0.25rem;">${q.name}</div>
-        <div style="color:var(--color-fog-muted);font-size:0.8rem;line-height:1.4;">${q.desc || 'Продолжить исследование...'}</div>
-        <div style="font-size:0.65rem;margin-top:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:${q.isDone ? 'var(--color-fog-muted)' : 'var(--color-fog-gold)'}">
-          ${q.isDone ? '[Переиграть заново]' : '[Отправиться]'}
-        </div>
-      `;
-
-      card.addEventListener('mouseenter', () => {
-        card.style.borderColor = 'var(--color-fog-gold)';
-      });
-      card.addEventListener('mouseleave', () => {
-        card.style.borderColor = q.isDone ? 'rgba(35,42,53,0.4)' : 'var(--color-fog-border)';
-      });
-      card.addEventListener('click', () => {
-        sounds.playAmbient();
-        engine.selectQuest(q.id);
-      });
-
-      grid.appendChild(card);
-    }
-
-    controlsContainer.appendChild(grid);
-    return;
+hubBtnNext.addEventListener('click', () => {
+  sounds.playButton();
+  if (currentCarouselIndex < hubQuestsList.length - 1) {
+    currentCarouselIndex++;
+    renderHub(engine.getState());
   }
+});
 
-  if (!currentLine) return;
-
-  // Check choices component
-  let choiceComponent: any = null;
-  for (const comp of Object.values(currentLine.components)) {
-    if (comp.type === 'line_choose' && comp.items) {
-      choiceComponent = comp;
-      break;
-    }
+hubBtnStartQuest.addEventListener('click', () => {
+  sounds.playButton();
+  if (hubQuestsList[currentCarouselIndex]) {
+    engine.selectQuest(hubQuestsList[currentCarouselIndex].id);
   }
+});
 
-  if (choiceComponent) {
-    const list = document.createElement('div');
-    list.style.cssText = 'display:flex;flex-direction:column;width:100%;';
+hubBtnAdvanceStory.addEventListener('click', () => {
+  sounds.playButton();
+  engine.advanceToNextStory();
+});
 
-    const items = Object.values(choiceComponent.items) as any[];
-    for (const it of items) {
-      const currentQuest = (engine as any).getCurrentQuestObj();
-      const rawText = currentQuest?.texts?.[it.text]?.text || engine.getCommonRu()?.[it.text]?.text || it.text;
+hubBtnMenu.addEventListener('click', () => {
+  sounds.playButton();
+  engine.returnToMenu();
+});
 
-      const btn = document.createElement('button');
-      btn.className = 'fog-btn-choice';
-      btn.innerHTML = `
-        <span>${rawText}</span>
-        <span class="choice-arrow">➔</span>
-      `;
+// Quest Top Bar
+questBtnBackHub.addEventListener('click', () => {
+  sounds.playButton();
+  engine.returnToHub();
+});
 
-      btn.addEventListener('click', () => {
-        sounds.playAmbient();
-        engine.choose(it.line, rawText);
-      });
+// Sound toggles
+const toggleSound = () => {
+  const active = sounds.toggle();
+  hubBtnSound.textContent = active ? '🔊' : '🔇';
+  questBtnSound.textContent = active ? '🔊' : '🔇';
+};
+hubBtnSound.addEventListener('click', toggleSound);
+questBtnSound.addEventListener('click', toggleSound);
 
-      list.appendChild(btn);
-    }
+// Inventory Modals
+const openInventory = () => {
+  sounds.playButton();
+  renderInventory();
+  modalInventory.style.display = 'flex';
+};
+hubBtnInv.addEventListener('click', openInventory);
+questBtnInv.addEventListener('click', openInventory);
+closeInventory.addEventListener('click', () => {
+  sounds.playButton();
+  modalInventory.style.display = 'none';
+});
 
-    controlsContainer.appendChild(list);
-  } else {
-    // Next step button
-    const btn = document.createElement('button');
-    btn.className = 'fog-btn-action';
-    btn.innerHTML = `
-      <span>Продолжить</span>
-      <span style="font-size:0.8rem;">➔</span>
-    `;
-
-    btn.addEventListener('click', () => {
-      sounds.playAmbient();
-      engine.step();
-    });
-
-    controlsContainer.appendChild(btn);
-  }
-}
-
-function renderInventoryModal() {
+function renderInventory(): void {
   inventoryList.innerHTML = '';
-  const state = engine.getState();
+  const inv = engine.getState().inventory;
   const catalog = engine.getItemsCatalog();
-  const items = Object.entries(state.inventory || {}).filter(([_, count]) => count > 0);
+  const commonRu = engine.getCommonRu();
 
-  if (items.length === 0) {
+  const entries = Object.entries(inv).filter(([_, count]) => count > 0);
+
+  if (entries.length === 0) {
     inventoryList.innerHTML = `
-      <div style="grid-column: 1/-1; text-align:center; padding: 1.5rem; color:var(--color-fog-muted); font-size:0.85rem;">
-        Инвентарь пуст. Исследуйте локации, чтобы находить предметы.
+      <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--color-fog-muted);font-size:0.85rem;">
+        Рюкзак пуст. Исследуйте мир и собирайте полезные предметы.
       </div>
     `;
     return;
   }
 
-  for (const [itemId, count] of items) {
+  for (const [itemId, count] of entries) {
+    const meta = catalog[itemId];
+    const nameKey = meta?.name_text;
+    const itemName = commonRu[nameKey]?.text || itemId;
     const card = document.createElement('div');
     card.className = 'inventory-item-card';
-
-    const itemData = catalog[itemId];
-    const imgPath = itemData?.image?.path || itemId;
-    const cleanImg = imgPath.toLowerCase().replace(/^items\//i, '');
-
     card.innerHTML = `
-      <img src="./assets/items/${cleanImg}.webp" class="inventory-item-img" onerror="this.style.display='none'" />
-      <span class="inventory-item-name">${itemId}</span>
-      <span class="inventory-item-count">x${count}</span>
+      <img src="./assets/items/${itemId}.webp" class="inventory-item-icon" onerror="this.src='./favicon.png';" alt="${itemName}" />
+      <div class="inventory-item-name">${itemName}</div>
+      <div class="inventory-item-count">× ${count} шт.</div>
     `;
     inventoryList.appendChild(card);
   }
 }
 
-function renderEpisodesModal() {
-  episodesList.innerHTML = '';
-  const state = engine.getState();
-  const episodes = engine.getEpisodesCatalog();
+// Settings Modal
+closeSettings.addEventListener('click', () => {
+  sounds.playButton();
+  modalSettings.style.display = 'none';
+});
 
-  const epNames: Record<string, string> = {
-    nazareth: 'Назарет (Эпизод 1)',
-    virsavia: 'Вирсавия (Эпизод 2)',
-    gilgal: 'Галгал (Эпизод 3)',
-  };
+btnExport.addEventListener('click', () => {
+  sounds.playButton();
+  const jsonStr = exportSaveJSON(engine.getState());
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TheFog_Session_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
-  for (const [epId, _] of Object.entries(episodes)) {
-    const btn = document.createElement('button');
-    btn.className = 'fog-modal-btn';
-    const isActive = state.currentEpisode === epId;
-    btn.style.borderColor = isActive ? 'var(--color-fog-gold)' : 'var(--color-fog-border)';
-    btn.innerHTML = `
-      <span style="color:${isActive ? 'var(--color-fog-gold)' : 'var(--color-fog-text)'}">${epNames[epId] || epId}</span>
-      <span style="font-size:0.7rem;color:var(--color-fog-muted);">${isActive ? '[Текущий]' : ''}</span>
-    `;
+btnImport.addEventListener('click', () => {
+  sounds.playButton();
+  fileInput.click();
+});
 
-    btn.addEventListener('click', () => {
-      if (state.currentEpisode !== epId) {
-        state.currentEpisode = epId;
-        state.currentStory = '0';
-        state.currentQuestId = '0';
-        state.currentLineId = 'Line_0';
-        modalEpisodes.style.display = 'none';
-        engine.selectQuest('0');
-      }
-    });
-
-    episodesList.appendChild(btn);
-  }
-}
-
-async function start() {
-  const savedState = loadStateFromLocal();
-
-  engine = new FogEngine(
-    savedState,
-    (state) => {
-      updateBackground(state.currentBackground);
-      renderControls();
-    },
-    (text, isChoice, pointChange) => {
-      appendLogMessage(text, isChoice, pointChange);
-    }
-  );
-
-  await engine.init();
-
-  const state = engine.getState();
-  if (state.history.length > 0) {
-    for (const h of state.history) {
-      appendLogMessage(h.text, h.isChoice, (h as any).pointChange);
-    }
-  } else {
-    engine.processLine('Line_0');
-  }
-
-  updateBackground(state.currentBackground);
-  renderControls();
-
-  // Header and modal events
-  soundToggle.addEventListener('click', () => {
-    const isMuted = sounds.toggleMute();
-    soundToggle.textContent = isMuted ? '🔇' : '🔊';
-  });
-
-  menuToggle.addEventListener('click', () => {
-    modalMenu.style.display = 'flex';
-  });
-  closeMenu.addEventListener('click', () => {
-    modalMenu.style.display = 'none';
-  });
-
-  invToggle.addEventListener('click', () => {
-    renderInventoryModal();
-    modalInventory.style.display = 'flex';
-  });
-  closeInventory.addEventListener('click', () => {
-    modalInventory.style.display = 'none';
-  });
-
-  epBtn.addEventListener('click', () => {
-    renderEpisodesModal();
-    modalEpisodes.style.display = 'flex';
-  });
-  closeEpisodes.addEventListener('click', () => {
-    modalEpisodes.style.display = 'none';
-  });
-
-  btnRestart.addEventListener('click', () => {
-    if (confirm('Начать игру заново? Весь текущий прогресс будет сброшен.')) {
-      engine.restartGame();
-    }
-  });
-
-  btnExport.addEventListener('click', () => {
-    const jsonStr = exportSaveJSON(engine.getState());
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `the_fog_save_${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-
-  btnImport.addEventListener('click', () => {
-    fileInput.click();
-  });
-
-  fileInput.addEventListener('change', async (e: any) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    const imported = importSaveJSON(text);
+fileInput.addEventListener('change', (e) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const content = event.target?.result as string;
+    const imported = importSaveJSON(content);
     if (imported) {
-      localStorage.setItem('thefog_save_state_v1', JSON.stringify(imported));
-      alert('Сохранение успешно импортировано!');
+      alert('Сессия и прогресс выборов успешно восстановлены!');
       location.reload();
     } else {
-      alert('Ошибка при чтении файла сохранения!');
+      alert('Ошибка чтения файла сохранения.');
     }
-  });
+  };
+  reader.readAsText(file);
+});
 
-  window.addEventListener(
-    'click',
-    () => {
-      sounds.playAmbient();
-    },
-    { once: true }
-  );
-}
-
-start();
+btnRestart.addEventListener('click', () => {
+  sounds.playButton();
+  if (confirm('Начать игру заново? Весь текущий прогресс будет сброшен.')) {
+    engine.restartGame();
+  }
+});

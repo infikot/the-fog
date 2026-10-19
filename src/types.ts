@@ -32,7 +32,18 @@ export interface GameLine {
   components: Record<string, LineComponent>;
 }
 
+export interface ChoiceHistoryEntry {
+  episode: string;
+  story: string;
+  questId: string;
+  fromLineId: string;
+  choiceLineId: string;
+  choiceText: string;
+  timestamp: number;
+}
+
 export interface GameState {
+  currentScreen: 'menu' | 'story_hub' | 'quest';
   currentEpisode: string;
   currentStory: string;
   currentQuestId: string | null;
@@ -45,12 +56,14 @@ export interface GameState {
     value_1: number; // Blue (Рассудок / Мораль / Наблюдательность)
     [key: string]: number;
   };
+  visitedLines: Record<string, boolean>;
+  choiceHistory: ChoiceHistoryEntry[];
   history: Array<{
     text: string;
     isChoice?: boolean;
     pointChange?: { red?: number; blue?: number };
   }>;
   currentBackground: string;
-  isEpisodeFinished?: boolean;
   gameFinished?: boolean;
+  hasStartedSession?: boolean;
 }

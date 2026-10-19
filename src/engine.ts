@@ -27,17 +27,17 @@ export class FogEngine {
     if (!this.state.currentStory) {
       this.state.currentStory = '0';
     }
-    if (this.state.currentQuestId === undefined) {
-      this.state.currentQuestId = '0';
-    }
-    if (!this.state.currentLineId) {
-      this.state.currentLineId = 'Line_0';
-    }
     if (!this.state.points) {
       this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0 };
     }
     if (!this.state.inventory) {
       this.state.inventory = {};
+    }
+    if (!this.state.visitedLines) {
+      this.state.visitedLines = {};
+    }
+    if (!this.state.choiceHistory) {
+      this.state.choiceHistory = [];
     }
   }
 
@@ -55,6 +55,44 @@ export class FogEngine {
 
   public getEpisodesCatalog(): any {
     return this.bundle?.episodes || {};
+  }
+
+  public startNewGame(): void {
+    this.state.hasStartedSession = true;
+    this.state.currentEpisode = this.bundle.first_episode || 'nazareth';
+    this.state.currentStory = '0';
+    this.state.currentQuestId = null;
+    this.state.currentLineId = 'Line_0';
+    this.state.completedQuests = [];
+    this.state.completedEpisodes = [];
+    this.state.inventory = {};
+    this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0 };
+    this.state.visitedLines = {};
+    this.state.choiceHistory = [];
+    this.state.history = [];
+    this.state.currentBackground = 'Backgrounds/1';
+    this.state.currentScreen = 'story_hub';
+    this.save();
+  }
+
+  public continueGame(): void {
+    if (!this.state.hasStartedSession) {
+      this.startNewGame();
+      return;
+    }
+    this.state.currentScreen = this.state.currentQuestId ? 'quest' : 'story_hub';
+    this.save();
+  }
+
+  public returnToMenu(): void {
+    this.state.currentScreen = 'menu';
+    this.save();
+  }
+
+  public returnToHub(): void {
+    this.state.currentScreen = 'story_hub';
+    this.state.currentQuestId = null;
+    this.save();
   }
 
   private getCurrentStoryObj(): any {
@@ -102,6 +140,8 @@ export class FogEngine {
   public selectQuest(questId: string): void {
     this.state.currentQuestId = questId;
     this.state.currentLineId = 'Line_0';
+    this.state.currentScreen = 'quest';
+    this.state.history = []; // Clear chat log for new quest run
     this.processLine('Line_0');
   }
 
@@ -113,13 +153,8 @@ export class FogEngine {
     if (currentStoryIndex !== -1 && currentStoryIndex < storyKeys.length - 1) {
       const nextStory = storyKeys[currentStoryIndex + 1];
       this.state.currentStory = nextStory;
-      const storyObj = epData.stories[nextStory];
-      const questKeys = Object.keys(storyObj?.quests || {});
-      this.state.currentQuestId = questKeys.length > 0 ? questKeys[0] : null;
-      this.state.currentLineId = 'Line_0';
-      if (this.state.currentQuestId) {
-        this.processLine('Line_0');
-      }
+      this.state.currentQuestId = null;
+      this.state.currentScreen = 'story_hub';
     } else {
       // Episode completed
       if (!this.state.completedEpisodes.includes(this.state.currentEpisode)) {
@@ -130,13 +165,8 @@ export class FogEngine {
       if (epIndex !== -1 && epIndex < epKeys.length - 1) {
         this.state.currentEpisode = epKeys[epIndex + 1];
         this.state.currentStory = '0';
-        const epDataNext = this.bundle.episodes?.[this.state.currentEpisode];
-        const nextQuests = Object.keys(epDataNext?.stories?.['0']?.quests || {});
-        this.state.currentQuestId = nextQuests.length > 0 ? nextQuests[0] : null;
-        this.state.currentLineId = 'Line_0';
-        if (this.state.currentQuestId) {
-          this.processLine('Line_0');
-        }
+        this.state.currentQuestId = null;
+        this.state.currentScreen = 'story_hub';
       } else {
         this.state.gameFinished = true;
       }
@@ -215,6 +245,17 @@ export class FogEngine {
   }
 
   public choose(choiceLine: string, choiceText: string): void {
+    // Track session choice history
+    this.state.choiceHistory.push({
+      episode: this.state.currentEpisode,
+      story: this.state.currentStory,
+      questId: this.state.currentQuestId || '0',
+      fromLineId: this.state.currentLineId,
+      choiceLineId: choiceLine,
+      choiceText,
+      timestamp: Date.now(),
+    });
+
     this.log(choiceText, true);
     this.goToLine(choiceLine);
   }
@@ -230,6 +271,10 @@ export class FogEngine {
     const lines = quest.graph?.lines || quest.lines;
     const line = lines?.[lineId];
     if (!line) return;
+
+    // Record line visit in session tracking
+    const fullLineKey = `${this.state.currentEpisode}_${this.state.currentStory}_${this.state.currentQuestId}_${lineId}`;
+    this.state.visitedLines[fullLineKey] = true;
 
     let redChange = 0;
     let blueChange = 0;
@@ -321,49 +366,31 @@ export class FogEngine {
       this.state.completedQuests.push(this.state.currentQuestId);
     }
 
+    // Return to story hub (original Unity logic)
+    this.state.currentScreen = 'story_hub';
+    this.state.currentQuestId = null;
+
     const story = this.getCurrentStoryObj();
     const allStoryQuests = Object.keys(story?.quests || {});
-    const isStoryDone = allStoryQuests.every((q) => {
+    const isStoryDone = allStoryQuests.length > 0 && allStoryQuests.every((q) => {
       const fullK = `${this.state.currentEpisode}_${this.state.currentStory}_${q}`;
       return this.state.completedQuests.includes(fullK) || this.state.completedQuests.includes(q);
     });
 
     if (isStoryDone) {
-      // Auto-unlock or set next story ready
+      // Check if we can automatically advance story
       const epData = this.bundle.episodes?.[this.state.currentEpisode];
       const storyKeys = Object.keys(epData?.stories || {});
       const currentStoryIndex = storyKeys.indexOf(this.state.currentStory);
 
       if (currentStoryIndex !== -1 && currentStoryIndex < storyKeys.length - 1) {
-        this.state.currentStory = storyKeys[currentStoryIndex + 1];
-        const nextQuests = Object.keys(epData.stories[this.state.currentStory]?.quests || {});
-        this.state.currentQuestId = nextQuests.length > 0 ? nextQuests[0] : null;
-        this.state.currentLineId = 'Line_0';
-        if (this.state.currentQuestId) {
-          this.processLine('Line_0');
-        }
+        // Next story available in hub
       } else {
         // Episode finished!
         if (!this.state.completedEpisodes.includes(this.state.currentEpisode)) {
           this.state.completedEpisodes.push(this.state.currentEpisode);
         }
-        const epKeys = Object.keys(this.bundle.episodes || {});
-        const epIndex = epKeys.indexOf(this.state.currentEpisode);
-        if (epIndex !== -1 && epIndex < epKeys.length - 1) {
-          this.state.currentEpisode = epKeys[epIndex + 1];
-          this.state.currentStory = '0';
-          const epNextQuests = Object.keys(this.bundle.episodes[this.state.currentEpisode]?.stories?.['0']?.quests || {});
-          this.state.currentQuestId = epNextQuests.length > 0 ? epNextQuests[0] : null;
-          this.state.currentLineId = 'Line_0';
-          if (this.state.currentQuestId) {
-            this.processLine('Line_0');
-          }
-        } else {
-          this.state.gameFinished = true;
-        }
       }
-    } else {
-      this.state.currentQuestId = null;
     }
 
     this.save();
@@ -380,7 +407,7 @@ export class FogEngine {
   }
 
   public restartGame(): void {
-    localStorage.clear();
+    this.startNewGame();
     location.reload();
   }
 }

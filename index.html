@@ -7,56 +7,126 @@
     <link rel="icon" type="image/png" href="./favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   </head>
   <body>
-    <!-- Background Layer -->
-    <div id="game-bg" style="position:fixed;inset:0;background-size:cover;background-position:center;transition:background-image 0.8s ease;z-index:0;opacity:0.38;pointer-events:none;"></div>
-    <div style="position:fixed;inset:0;background:linear-gradient(to top, #0b0d10 0%, rgba(11,13,16,0.85) 50%, rgba(11,13,16,0.6) 100%);z-index:0;pointer-events:none;"></div>
+    <!-- Atmospheric Background Layers -->
+    <div id="game-bg" style="position:fixed;inset:0;background-size:cover;background-position:center;transition:background-image 0.9s ease;z-index:0;opacity:0.35;pointer-events:none;"></div>
+    <div class="fog-atmosphere"></div>
+    <div class="fog-mist"></div>
 
-    <!-- Header -->
-    <header class="fog-header">
-      <div style="display:flex;align-items:center;gap:0.5rem;">
-        <span class="fog-title">ТУМАН</span>
-        <button id="ep-btn" class="fog-badge" title="Сменить главу">Назарет</button>
+    <!-- ======================================================== -->
+    <!-- 1. MAIN MENU SCREEN (Shown on Launch)                    -->
+    <!-- ======================================================== -->
+    <section id="screen-menu">
+      <div class="menu-title-block">
+        <h1 class="menu-game-title">ТУМАН</h1>
+        <div class="menu-game-subtitle">Интерактивная новелла</div>
       </div>
 
-      <!-- Moral & Status Indicators (Red & Blue Points) -->
-      <div class="fog-points-bar">
-        <div class="fog-point-item red" title="Сила / Агрессия / Выживание">
-          <span class="point-dot red"></span>
-          <span class="point-label">СИЛА</span>
-          <span id="points-red-val" class="point-val">0</span>
+      <div class="menu-buttons-list">
+        <button id="menu-btn-start" class="btn-menu-action primary">Начать игру</button>
+        <button id="menu-btn-continue" class="btn-menu-action" style="display:none;">Продолжить</button>
+        <button id="menu-btn-settings" class="btn-menu-action">Настройки</button>
+      </div>
+
+      <div style="position:absolute;bottom:1.5rem;font-size:0.65rem;color:var(--color-fog-muted);letter-spacing:0.1em;text-transform:uppercase;">
+        Версия Web Port • Сохранение в кэше
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- 2. STORY / QUEST HUB SCREEN (Carousel & Cards)           -->
+    <!-- ======================================================== -->
+    <section id="screen-hub" style="display:none;">
+      <div class="hub-header">
+        <div>
+          <div id="hub-ep-title" class="hub-episode-title">НАЗАРЕТ</div>
+          <div id="hub-story-title" class="hub-story-subtitle">Глава 0</div>
         </div>
-        <div class="fog-point-item blue" title="Рассудок / Человечность / Мораль">
-          <span class="point-dot blue"></span>
-          <span class="point-label">РАССУДОК</span>
-          <span id="points-blue-val" class="point-val">0</span>
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <button id="hub-btn-inv" class="fog-btn-icon" title="Инвентарь">🎒</button>
+          <button id="hub-btn-sound" class="fog-btn-icon" title="Звук">🔊</button>
+          <button id="hub-btn-menu" class="btn-header-back">В меню</button>
         </div>
       </div>
 
-      <div style="display:flex;align-items:center;gap:0.4rem;">
-        <button id="inv-toggle" class="fog-btn-icon" title="Инвентарь">🎒</button>
-        <button id="sound-toggle" class="fog-btn-icon" title="Звук">🔊</button>
-        <button id="menu-toggle" class="fog-btn-menu">Меню</button>
-      </div>
-    </header>
+      <div class="hub-carousel-wrap">
+        <div class="hub-card-box animate-fade-in" id="hub-card-box">
+          <div class="hub-card-image-wrap">
+            <img id="hub-card-img" class="hub-card-image" src="" alt="Локация" />
+            <div style="position:absolute;top:0.75rem;right:0.75rem;padding:0.25rem 0.6rem;background:rgba(7,9,12,0.85);border-radius:4px;border:1px solid var(--color-fog-border);font-size:0.68rem;color:var(--color-fog-gold);text-transform:uppercase;letter-spacing:0.05em;" id="hub-card-status">
+              Доступно
+            </div>
+          </div>
+          <div class="hub-card-info">
+            <h3 id="hub-card-title" class="hub-card-title">Название квеста</h3>
+            <p id="hub-card-desc" class="hub-card-desc">Описание локации и точки исследования...</p>
 
-    <!-- Main Quest Story Log -->
-    <main class="fog-main">
-      <div id="log-container">
-        <!-- Lines injected dynamically -->
-      </div>
-    </main>
+            <div class="hub-card-nav-row">
+              <button id="hub-btn-prev" class="btn-hub-arrow" title="Предыдущая локация">‹</button>
+              <button id="hub-btn-start-quest" class="btn-hub-start">Исследовать ➔</button>
+              <button id="hub-btn-next" class="btn-hub-arrow" title="Следующая локация">›</button>
+            </div>
+          </div>
+        </div>
 
-    <!-- Footer Controls -->
-    <footer class="fog-footer">
-      <div class="fog-footer-inner" id="controls-container">
-        <!-- Choices / Next Step buttons -->
+        <div id="hub-advance-box" style="margin-top:1.5rem;width:100%;max-width:420px;display:none;">
+          <button id="hub-btn-advance-story" class="btn-menu-action primary" style="width:100%;">
+            Перейти к следующей главе ➔
+          </button>
+        </div>
       </div>
-    </footer>
+    </section>
 
-    <!-- Inventory Modal Dialog -->
+    <!-- ======================================================== -->
+    <!-- 3. ACTIVE QUEST SCREEN (Story Log & Dialog Choices)      -->
+    <!-- ======================================================== -->
+    <section id="screen-quest" style="display:none;">
+      <header class="fog-header">
+        <div class="fog-header-left">
+          <button id="quest-btn-back-hub" class="btn-header-back" title="Назад к карте">‹ Карта</button>
+          <span class="fog-title-small">ТУМАН</span>
+        </div>
+
+        <!-- Moral & Status Indicators (Red & Blue Points) -->
+        <div class="fog-points-bar">
+          <div class="fog-point-item red" title="Сила / Агрессия / Выживание">
+            <span class="point-dot red"></span>
+            <span class="point-label">СИЛА</span>
+            <span id="points-red-val" class="point-val">0</span>
+          </div>
+          <div class="fog-point-item blue" title="Рассудок / Человечность / Мораль">
+            <span class="point-dot blue"></span>
+            <span class="point-label">РАССУДОК</span>
+            <span id="points-blue-val" class="point-val">0</span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:0.4rem;">
+          <button id="quest-btn-inv" class="fog-btn-icon" title="Инвентарь">🎒</button>
+          <button id="quest-btn-sound" class="fog-btn-icon" title="Звук">🔊</button>
+        </div>
+      </header>
+
+      <!-- Main Quest Story Log -->
+      <main class="fog-main">
+        <div id="log-container">
+          <!-- Text lines and choices injected dynamically -->
+        </div>
+      </main>
+
+      <!-- Footer Controls -->
+      <footer class="fog-footer">
+        <div class="fog-footer-inner" id="controls-container">
+          <!-- Choices / Next Step buttons -->
+        </div>
+      </footer>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- MODALS: Inventory, Settings & Saves                      -->
+    <!-- ======================================================== -->
     <div id="modal-inventory" class="fog-modal-backdrop" style="display:none;">
       <div class="fog-modal-box">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-fog-border);padding-bottom:0.75rem;margin-bottom:0.75rem;">
@@ -69,32 +139,18 @@
       </div>
     </div>
 
-    <!-- Episodes / Chapters Modal -->
-    <div id="modal-episodes" class="fog-modal-backdrop" style="display:none;">
-      <div class="fog-modal-box">
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-fog-border);padding-bottom:0.75rem;margin-bottom:0.75rem;">
-          <span class="fog-modal-title">Главы путешествия</span>
-          <button id="close-episodes" class="fog-close-btn">✕</button>
-        </div>
-        <div id="episodes-list" style="display:flex;flex-direction:column;gap:0.5rem;">
-          <!-- Episodes -->
-        </div>
-      </div>
-    </div>
-
-    <!-- Save/Load Modal Dialog -->
-    <div id="modal-menu" class="fog-modal-backdrop" style="display:none;">
+    <div id="modal-settings" class="fog-modal-backdrop" style="display:none;">
       <div class="fog-modal-box">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-fog-border);padding-bottom:0.75rem;margin-bottom:0.75rem;">
           <span class="fog-modal-title">Настройки и сейвы</span>
-          <button id="close-menu" class="fog-close-btn">✕</button>
+          <button id="close-settings" class="fog-close-btn">✕</button>
         </div>
         <p style="font-size:0.78rem;color:var(--color-fog-muted);line-height:1.5;margin-bottom:0.75rem;">
-          Каждое ваше решение мгновенно сохраняется в кэше устройства.
+          Экспортируйте сохранение активной сессии с историей всех выборов и развилок.
         </p>
-        <div style="display:flex;flex-direction:column;gap:0.25rem;">
+        <div style="display:flex;flex-direction:column;gap:0.4rem;">
           <button id="btn-export" class="fog-modal-btn">
-            <span>Экспорт сохранения (JSON)</span>
+            <span>Экспорт сессии (JSON)</span>
             <span>💾</span>
           </button>
           <button id="btn-import" class="fog-modal-btn">
@@ -110,6 +166,7 @@
       </div>
     </div>
 
-    <script type="module" src="./src/main.ts"></script>
+    <link rel="stylesheet" href="./bundle.css" />
+    <script type="module" src="./bundle.js"></script>
   </body>
 </html>
