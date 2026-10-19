@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0" />
   </head>
   <body>
     <!-- Atmospheric Background Layers -->
@@ -45,9 +46,15 @@
           <div id="hub-story-title" class="hub-story-subtitle">Глава 0</div>
         </div>
         <div style="display:flex;align-items:center;gap:0.4rem;">
-          <button id="hub-btn-inv" class="fog-btn-icon" title="Инвентарь">🎒</button>
-          <button id="hub-btn-sound" class="fog-btn-icon" title="Звук">🔊</button>
-          <button id="hub-btn-menu" class="btn-header-back">В меню</button>
+          <button id="hub-btn-inv" class="fog-btn-icon" title="Инвентарь">
+            <span class="material-symbols-outlined">backpack</span>
+          </button>
+          <button id="hub-btn-sound" class="fog-btn-icon" title="Звук">
+            <span class="material-symbols-outlined" id="hub-sound-icon">volume_up</span>
+          </button>
+          <button id="hub-btn-menu" class="btn-header-back" title="Главное меню">
+            <span class="material-symbols-outlined" style="font-size:1.1rem;">home</span>
+          </button>
         </div>
       </div>
 
@@ -89,23 +96,23 @@
           <span class="fog-title-small">ТУМАН</span>
         </div>
 
-        <!-- Moral & Status Indicators (Red & Blue Points) -->
+        <!-- Moral & Status Indicators (Red & Blue Points): Pure clean numbers -->
         <div class="fog-points-bar">
-          <div class="fog-point-item red" title="Сила / Агрессия / Выживание">
-            <span class="point-dot red"></span>
-            <span class="point-label">СИЛА</span>
-            <span id="points-red-val" class="point-val">0</span>
+          <div class="fog-point-item" title="Сила / Агрессия">
+            <span id="points-red-val" class="point-val red">0</span>
           </div>
-          <div class="fog-point-item blue" title="Рассудок / Человечность / Мораль">
-            <span class="point-dot blue"></span>
-            <span class="point-label">РАССУДОК</span>
-            <span id="points-blue-val" class="point-val">0</span>
+          <div class="fog-point-item" title="Рассудок / Мораль">
+            <span id="points-blue-val" class="point-val blue">0</span>
           </div>
         </div>
 
         <div style="display:flex;align-items:center;gap:0.4rem;">
-          <button id="quest-btn-inv" class="fog-btn-icon" title="Инвентарь">🎒</button>
-          <button id="quest-btn-sound" class="fog-btn-icon" title="Звук">🔊</button>
+          <button id="quest-btn-inv" class="fog-btn-icon" title="Инвентарь">
+            <span class="material-symbols-outlined">backpack</span>
+          </button>
+          <button id="quest-btn-sound" class="fog-btn-icon" title="Звук">
+            <span class="material-symbols-outlined" id="quest-sound-icon">volume_up</span>
+          </button>
         </div>
       </header>
 
@@ -151,16 +158,16 @@
         <div style="display:flex;flex-direction:column;gap:0.4rem;">
           <button id="btn-export" class="fog-modal-btn">
             <span>Экспорт сессии (JSON)</span>
-            <span>💾</span>
+            <span class="material-symbols-outlined" style="font-size:1.15rem;">download</span>
           </button>
           <button id="btn-import" class="fog-modal-btn">
             <span>Импорт сохранения</span>
-            <span>📂</span>
+            <span class="material-symbols-outlined" style="font-size:1.15rem;">upload</span>
           </button>
           <input type="file" id="file-input" accept=".json" style="display:none;" />
           <button id="btn-restart" class="fog-modal-btn" style="color:#f87171;border-color:rgba(239,68,68,0.3);margin-top:0.75rem;">
             <span>Начать заново с Пролога</span>
-            <span>⚠️</span>
+            <span class="material-symbols-outlined" style="font-size:1.15rem;">refresh</span>
           </button>
         </div>
       </div>

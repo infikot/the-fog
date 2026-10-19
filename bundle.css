@@ -357,56 +357,59 @@ body {
 .fog-points-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1.15rem;
 }
 .fog-point-item {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  background: rgba(16, 20, 26, 0.85);
-  border: 1px solid var(--color-fog-border);
-  padding: 0.25rem 0.55rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-.fog-point-item.red {
-  border-color: rgba(239, 68, 68, 0.35);
-}
-.fog-point-item.blue {
-  border-color: rgba(56, 189, 248, 0.35);
-}
-.point-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-.point-dot.red {
-  background: var(--color-fog-red);
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
-}
-.point-dot.blue {
-  background: var(--color-fog-blue);
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
 }
 .point-val {
-  font-family: monospace;
-  font-size: 0.82rem;
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
 }
-.fog-point-item.red .point-val {
-  color: #fca5a5;
+.point-val.red {
+  color: #ef4444;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
 }
-.fog-point-item.blue .point-val {
-  color: #bae6fd;
+.point-val.blue {
+  color: #38bdf8;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
 }
-.point-label {
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 300,
+    "GRAD" 0,
+    "opsz" 24;
+  vertical-align: middle;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.fog-btn-icon {
+  background: transparent;
+  border: 1px solid var(--color-fog-border);
   color: var(--color-fog-muted);
-  font-size: 0.62rem;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
 }
-@media (max-width: 480px) {
-  .point-label {
-    display: none;
-  }
+.fog-btn-icon:hover {
+  border-color: var(--color-fog-gold);
+  color: var(--color-fog-gold);
+  background: rgba(197, 160, 89, 0.08);
 }
 .fog-main {
   flex: 1;

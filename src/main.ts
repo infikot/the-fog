@@ -310,10 +310,14 @@ questBtnBackHub.addEventListener('click', () => {
 });
 
 // Sound toggles
+const hubSoundIcon = document.getElementById('hub-sound-icon') as HTMLElement;
+const questSoundIcon = document.getElementById('quest-sound-icon') as HTMLElement;
+
 const toggleSound = () => {
   const active = sounds.toggle();
-  hubBtnSound.textContent = active ? '🔊' : '🔇';
-  questBtnSound.textContent = active ? '🔊' : '🔇';
+  const iconName = active ? 'volume_up' : 'volume_off';
+  if (hubSoundIcon) hubSoundIcon.textContent = iconName;
+  if (questSoundIcon) questSoundIcon.textContent = iconName;
 };
 hubBtnSound.addEventListener('click', toggleSound);
 questBtnSound.addEventListener('click', toggleSound);
