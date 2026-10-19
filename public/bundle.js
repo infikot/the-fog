@@ -132,12 +132,12 @@ function importSaveJSON(jsonStr) {
 
 // src/engine.ts
 var FogEngine = class {
-  constructor(initialState2, onStateChange, onLog) {
+  constructor(initialState, onStateChange, onLog) {
     __publicField(this, "state");
     __publicField(this, "bundle", null);
     __publicField(this, "onStateChange");
     __publicField(this, "onLog");
-    this.state = { ...initialState2 };
+    this.state = { ...initialState };
     this.onStateChange = onStateChange;
     this.onLog = onLog;
   }
@@ -151,7 +151,7 @@ var FogEngine = class {
       this.state.currentStory = "0";
     }
     if (!this.state.points) {
-      this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0 };
+      this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0, good: 0, bad: 0 };
     }
     if (!this.state.inventory) {
       this.state.inventory = {};
@@ -179,17 +179,18 @@ var FogEngine = class {
     this.state.hasStartedSession = true;
     this.state.currentEpisode = this.bundle.first_episode || "nazareth";
     this.state.currentStory = "0";
-    this.state.currentQuestId = null;
+    this.state.currentQuestId = "0";
     this.state.currentLineId = "Line_0";
     this.state.completedQuests = [];
     this.state.completedEpisodes = [];
     this.state.inventory = {};
-    this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0 };
+    this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0, good: 0, bad: 0 };
     this.state.visitedLines = {};
     this.state.choiceHistory = [];
     this.state.history = [];
     this.state.currentBackground = "Backgrounds/1";
-    this.state.currentScreen = "story_hub";
+    this.state.currentScreen = "quest";
+    this.processLine("Line_0");
     this.save();
   }
   continueGame() {
@@ -197,39 +198,36 @@ var FogEngine = class {
       this.startNewGame();
       return;
     }
-    this.state.currentScreen = this.state.currentQuestId ? "quest" : "story_hub";
+    if (!this.state.currentQuestId) {
+      const story = this.getCurrentStoryObj();
+      const firstQ = Object.keys(story?.quests || {})[0] || "0";
+      this.selectQuest(firstQ);
+      return;
+    }
+    this.state.currentScreen = "quest";
     this.save();
   }
   returnToMenu() {
     this.state.currentScreen = "menu";
     this.save();
   }
-  returnToHub() {
-    this.state.currentScreen = "story_hub";
-    this.state.currentQuestId = null;
-    this.save();
+  getCurrentEpisodeObj() {
+    return this.bundle?.episodes?.[this.state.currentEpisode];
   }
   getCurrentStoryObj() {
-    if (!this.bundle) return null;
-    return this.bundle.episodes?.[this.state.currentEpisode]?.stories?.[this.state.currentStory] || null;
+    const ep = this.getCurrentEpisodeObj();
+    return ep?.stories?.[this.state.currentStory];
   }
   getCurrentQuestObj() {
     const story = this.getCurrentStoryObj();
     if (!story || !this.state.currentQuestId) return null;
-    return story.quests?.[this.state.currentQuestId] || null;
+    return story.quests?.[this.state.currentQuestId];
   }
-  getCurrentLine() {
+  getCurrentLineObj() {
     const quest = this.getCurrentQuestObj();
     if (!quest) return null;
     const lines = quest.graph?.lines || quest.lines;
-    if (!lines) return null;
-    return lines[this.state.currentLineId] || null;
-  }
-  getChoiceText(textKey) {
-    const quest = this.getCurrentQuestObj();
-    const story = this.getCurrentStoryObj();
-    const raw = quest?.texts?.[textKey]?.text || story?.texts?.[textKey]?.text || story?.texts?.ru?.[textKey]?.text || this.bundle?.all_texts?.[textKey]?.text || this.bundle?.common_texts?.[textKey]?.text || textKey;
-    return raw.replace(/<\/?(?:i|b|color[^>]*|size[^>]*)>/gi, "").trim();
+    return lines?.[this.state.currentLineId] || null;
   }
   getAvailableQuests() {
     const story = this.getCurrentStoryObj();
@@ -272,97 +270,117 @@ var FogEngine = class {
     if (currentStoryIndex !== -1 && currentStoryIndex < storyKeys.length - 1) {
       const nextStory = storyKeys[currentStoryIndex + 1];
       this.state.currentStory = nextStory;
-      this.state.currentQuestId = null;
-      this.state.currentScreen = "story_hub";
+      const nextStoryObj = epData.stories[nextStory];
+      const firstQ = Object.keys(nextStoryObj?.quests || {})[0] || "0";
+      this.selectQuest(firstQ);
     } else {
       if (!this.state.completedEpisodes.includes(this.state.currentEpisode)) {
         this.state.completedEpisodes.push(this.state.currentEpisode);
       }
-      const epKeys = Object.keys(this.bundle.episodes || {});
-      const epIndex = epKeys.indexOf(this.state.currentEpisode);
-      if (epIndex !== -1 && epIndex < epKeys.length - 1) {
-        this.state.currentEpisode = epKeys[epIndex + 1];
+      const allEpisodes = Object.keys(this.bundle.episodes || {});
+      const currentEpIndex = allEpisodes.indexOf(this.state.currentEpisode);
+      if (currentEpIndex !== -1 && currentEpIndex < allEpisodes.length - 1) {
+        const nextEp = allEpisodes[currentEpIndex + 1];
+        this.state.currentEpisode = nextEp;
         this.state.currentStory = "0";
-        this.state.currentQuestId = null;
-        this.state.currentScreen = "story_hub";
+        const nextEpObj = this.bundle.episodes[nextEp];
+        const nextStoryObj = nextEpObj?.stories?.["0"];
+        const firstQ = Object.keys(nextStoryObj?.quests || {})[0] || "0";
+        this.selectQuest(firstQ);
       } else {
-        this.state.gameFinished = true;
+        alert("\u041F\u043E\u0437\u0434\u0440\u0430\u0432\u043B\u044F\u0435\u043C! \u0412\u044B \u043F\u0440\u043E\u0448\u043B\u0438 \u0432\u0441\u0435 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0435 \u044D\u043F\u0438\u0437\u043E\u0434\u044B \u0438\u0433\u0440\u044B \xAB\u0422\u0443\u043C\u0430\u043D\xBB!");
+        this.returnToMenu();
       }
     }
     this.save();
   }
+  getChoiceText(textKey) {
+    const quest = this.getCurrentQuestObj();
+    const texts = quest?.texts || {};
+    return texts[textKey]?.text || this.bundle?.common_texts?.[textKey]?.text || "";
+  }
   step() {
-    const line = this.getCurrentLine();
-    if (!line) return;
-    for (const comp of Object.values(line.components)) {
-      if (comp.type === "line_next" && comp.line) {
-        this.goToLine(comp.line);
-        return;
-      }
-      if (comp.type === "line_next_points") {
-        const nextTarget = this.evaluateNextPoints(comp);
-        if (nextTarget) {
-          this.goToLine(nextTarget);
-          return;
-        }
-      }
-      if (comp.type === "line_next_item") {
-        const nextTarget = this.evaluateNextItem(comp);
-        if (nextTarget) {
-          this.goToLine(nextTarget);
-          return;
-        }
-      }
-      if (comp.type === "line_to_quests") {
-        this.finishCurrentQuest();
+    const currentLine = this.getCurrentLineObj();
+    if (!currentLine) return;
+    const comps = Object.values(currentLine.components);
+    if (comps.some((c) => c.type === "line_to_quests")) {
+      this.finishCurrentQuest();
+      return;
+    }
+    const nextPointsComp = comps.find((c) => c.type === "line_next_points");
+    if (nextPointsComp) {
+      const targetLine = this.evalPointsBranch(nextPointsComp);
+      if (targetLine) {
+        this.goToLine(targetLine);
         return;
       }
     }
+    const nextItemComp = comps.find((c) => c.type === "line_next_item");
+    if (nextItemComp) {
+      const targetLine = this.evalItemBranch(nextItemComp);
+      if (targetLine) {
+        this.goToLine(targetLine);
+        return;
+      }
+    }
+    const nextComp = comps.find((c) => c.type === "line_next" && c.line);
+    if (nextComp && nextComp.line) {
+      this.goToLine(nextComp.line);
+      return;
+    }
+    this.finishCurrentQuest();
   }
-  evaluateNextPoints(comp) {
+  evalPointsBranch(comp) {
     if (comp.comparers) {
-      const comparers = Object.values(comp.comparers);
-      for (const c of comparers) {
-        const pointKey = c.name === "second" || c.name === "value_1" ? "value_1" : "value_0";
-        const currentVal = this.state.points[pointKey] || 0;
-        const targetVal = c.value ?? 0;
-        const comparer = c.comparer ?? 0;
-        let matches = false;
-        switch (comparer) {
+      for (const c of Object.values(comp.comparers)) {
+        const pName = c.name;
+        const isBlue = pName === "second" || pName === "value_1" || pName === "good";
+        const normKey = isBlue ? "value_1" : "value_0";
+        const val = this.state.points[pName] ?? this.state.points[normKey] ?? 0;
+        const target = c.value || 0;
+        let pass = false;
+        switch (c.comparer) {
           case 0:
-            matches = currentVal === targetVal;
+            pass = val === target;
             break;
+          // Equal
           case 1:
-            matches = currentVal !== targetVal;
+            pass = val !== target;
             break;
+          // NotEqual
           case 2:
-            matches = currentVal < targetVal;
+            pass = val < target;
             break;
+          // Less
           case 3:
-            matches = currentVal <= targetVal;
+            pass = val <= target;
             break;
+          // LessEqual
           case 4:
-            matches = currentVal >= targetVal;
+            pass = val > target;
             break;
+          // Greater
           case 5:
-            matches = currentVal > targetVal;
+            pass = val >= target;
             break;
+          // GreaterEqual
           default:
-            matches = currentVal >= targetVal;
+            pass = val >= target;
             break;
         }
-        if (matches && c.line) {
+        if (pass && c.line) {
           return c.line;
         }
       }
     }
     return comp.line || null;
   }
-  evaluateNextItem(comp) {
+  evalItemBranch(comp) {
     if (comp.comparers) {
-      const comparers = Object.values(comp.comparers);
-      for (const c of comparers) {
-        if (c.item && (this.state.inventory[c.item] || 0) > 0 && c.line) {
+      for (const c of Object.values(comp.comparers)) {
+        const item = c.item;
+        const hasItem = (this.state.inventory[item] || 0) > 0;
+        if (hasItem && c.line) {
           return c.line;
         }
       }
@@ -435,7 +453,7 @@ var FogEngine = class {
     let redDiff = 0;
     let blueDiff = 0;
     for (const mod of mods) {
-      const isBlue = mod.name === "second" || mod.name === "value_1";
+      const isBlue = mod.name === "second" || mod.name === "value_1" || mod.name === "good";
       const key = isBlue ? "value_1" : "value_0";
       const current = this.state.points[key] || 0;
       let next = current;
@@ -443,12 +461,15 @@ var FogEngine = class {
         case 0:
           next = mod.value;
           break;
+        // Set
         case 1:
           next = current + mod.value;
           break;
+        // Add
         case 2:
           next = current - mod.value;
           break;
+        // Sub
         default:
           next = current + mod.value;
           break;
@@ -472,24 +493,14 @@ var FogEngine = class {
     if (this.state.currentQuestId && !this.state.completedQuests.includes(this.state.currentQuestId)) {
       this.state.completedQuests.push(this.state.currentQuestId);
     }
-    this.state.currentScreen = "story_hub";
-    this.state.currentQuestId = null;
     const story = this.getCurrentStoryObj();
-    const allStoryQuests = Object.keys(story?.quests || {});
-    const isStoryDone = allStoryQuests.length > 0 && allStoryQuests.every((q) => {
-      const fullK = `${this.state.currentEpisode}_${this.state.currentStory}_${q}`;
-      return this.state.completedQuests.includes(fullK) || this.state.completedQuests.includes(q);
-    });
-    if (isStoryDone) {
-      const epData = this.bundle.episodes?.[this.state.currentEpisode];
-      const storyKeys = Object.keys(epData?.stories || {});
-      const currentStoryIndex = storyKeys.indexOf(this.state.currentStory);
-      if (currentStoryIndex !== -1 && currentStoryIndex < storyKeys.length - 1) {
-      } else {
-        if (!this.state.completedEpisodes.includes(this.state.currentEpisode)) {
-          this.state.completedEpisodes.push(this.state.currentEpisode);
-        }
-      }
+    const storyQuests = Object.keys(story?.quests || {});
+    const currentQIndex = storyQuests.indexOf(this.state.currentQuestId || "0");
+    if (currentQIndex !== -1 && currentQIndex < storyQuests.length - 1) {
+      const nextQId = storyQuests[currentQIndex + 1];
+      this.selectQuest(nextQId);
+    } else {
+      this.advanceToNextStory();
     }
     this.save();
   }
@@ -512,27 +523,59 @@ var SoundManager = class {
   constructor() {
     __publicField(this, "ambientAudio", null);
     __publicField(this, "isMuted", false);
-    __publicField(this, "currentAmbientTrack", 1);
-    __publicField(this, "sfxVolume", 0.6);
+    __publicField(this, "sfxVolume", 0.8);
     __publicField(this, "ambientVolume", 0.35);
+    __publicField(this, "sfxPool", {});
+    this.loadSettings();
+    this.preloadSfx();
     this.initAmbient(1);
+  }
+  loadSettings() {
+    try {
+      const saved = localStorage.getItem("thefog_sound_config");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.sfxVolume === "number") this.sfxVolume = parsed.sfxVolume;
+        if (typeof parsed.ambientVolume === "number") this.ambientVolume = parsed.ambientVolume;
+        if (typeof parsed.isMuted === "boolean") this.isMuted = parsed.isMuted;
+      }
+    } catch (e) {
+    }
+  }
+  saveSettings() {
+    try {
+      localStorage.setItem("thefog_sound_config", JSON.stringify({
+        sfxVolume: this.sfxVolume,
+        ambientVolume: this.ambientVolume,
+        isMuted: this.isMuted
+      }));
+    } catch (e) {
+    }
+  }
+  preloadSfx() {
+    const sfxList = ["button", "choice", "inventory", "cards"];
+    for (const name of sfxList) {
+      const a = new Audio(`./assets/audio/so_${name}_1.mp3`);
+      a.preload = "auto";
+      this.sfxPool[name] = a;
+    }
   }
   initAmbient(trackNum) {
     if (this.ambientAudio) {
       this.ambientAudio.pause();
       this.ambientAudio = null;
     }
-    this.currentAmbientTrack = trackNum;
     this.ambientAudio = new Audio(`./assets/audio/mu_ambient_${trackNum}.mp3`);
     this.ambientAudio.loop = true;
-    this.ambientAudio.volume = this.ambientVolume;
+    this.ambientAudio.volume = this.isMuted ? 0 : this.ambientVolume;
   }
-  playAmbient(trackNum) {
-    if (this.isMuted) return;
-    if (trackNum && trackNum !== this.currentAmbientTrack) {
+  playAmbient(trackNum = 1) {
+    if (this.isMuted || this.ambientVolume <= 0) return;
+    if (!this.ambientAudio) {
       this.initAmbient(trackNum);
     }
     if (this.ambientAudio) {
+      this.ambientAudio.volume = this.ambientVolume;
       this.ambientAudio.play().catch(() => {
       });
     }
@@ -543,12 +586,20 @@ var SoundManager = class {
     }
   }
   playSfx(name) {
-    if (this.isMuted) return;
+    if (this.isMuted || this.sfxVolume <= 0) return;
     try {
-      const audio = new Audio(`./assets/audio/so_${name}_1.mp3`);
-      audio.volume = this.sfxVolume;
-      audio.play().catch(() => {
-      });
+      const original = this.sfxPool[name];
+      if (original) {
+        const audio = original.cloneNode();
+        audio.volume = this.sfxVolume;
+        audio.play().catch(() => {
+        });
+      } else {
+        const audio = new Audio(`./assets/audio/so_${name}_1.mp3`);
+        audio.volume = this.sfxVolume;
+        audio.play().catch(() => {
+        });
+      }
     } catch (e) {
     }
   }
@@ -564,6 +615,29 @@ var SoundManager = class {
   playCards() {
     this.playSfx("cards");
   }
+  setSfxVolume(vol) {
+    this.sfxVolume = Math.max(0, Math.min(1, vol));
+    this.saveSettings();
+  }
+  getSfxVolume() {
+    return this.sfxVolume;
+  }
+  setAmbientVolume(vol) {
+    this.ambientVolume = Math.max(0, Math.min(1, vol));
+    if (this.ambientAudio) {
+      this.ambientAudio.volume = this.isMuted ? 0 : this.ambientVolume;
+      if (this.ambientVolume > 0 && this.ambientAudio.paused && !this.isMuted) {
+        this.ambientAudio.play().catch(() => {
+        });
+      } else if (this.ambientVolume === 0) {
+        this.ambientAudio.pause();
+      }
+    }
+    this.saveSettings();
+  }
+  getAmbientVolume() {
+    return this.ambientVolume;
+  }
   toggle() {
     this.isMuted = !this.isMuted;
     if (this.isMuted) {
@@ -571,6 +645,7 @@ var SoundManager = class {
     } else {
       this.playAmbient();
     }
+    this.saveSettings();
     return !this.isMuted;
   }
   getMuted() {
@@ -579,91 +654,93 @@ var SoundManager = class {
 };
 
 // src/main.ts
+var sounds = new SoundManager();
+var engine = new FogEngine(
+  loadStateFromLocal(),
+  (state) => renderApp(state),
+  (text, isChoice, pointChange) => appendLogMessage(text, isChoice, pointChange)
+);
 var screenMenu = document.getElementById("screen-menu");
 var screenHub = document.getElementById("screen-hub");
 var screenQuest = document.getElementById("screen-quest");
 var gameBg = document.getElementById("game-bg");
-var menuBtnStart = document.getElementById("menu-btn-start");
-var menuBtnContinue = document.getElementById("menu-btn-continue");
-var menuBtnSettings = document.getElementById("menu-btn-settings");
-var hubEpTitle = document.getElementById("hub-ep-title");
-var hubStoryTitle = document.getElementById("hub-story-title");
-var hubCardImg = document.getElementById("hub-card-img");
-var hubCardTitle = document.getElementById("hub-card-title");
-var hubCardDesc = document.getElementById("hub-card-desc");
-var hubCardStatus = document.getElementById("hub-card-status");
-var hubBtnPrev = document.getElementById("hub-btn-prev");
-var hubBtnNext = document.getElementById("hub-btn-next");
-var hubBtnStartQuest = document.getElementById("hub-btn-start-quest");
-var hubAdvanceBox = document.getElementById("hub-advance-box");
-var hubBtnAdvanceStory = document.getElementById("hub-btn-advance-story");
-var hubBtnMenu = document.getElementById("hub-btn-menu");
-var hubBtnInv = document.getElementById("hub-btn-inv");
-var hubBtnSound = document.getElementById("hub-btn-sound");
-var questBtnBackHub = document.getElementById("quest-btn-back-hub");
+var btnStart = document.getElementById("menu-btn-start");
+var btnContinue = document.getElementById("menu-btn-continue");
+var btnSettingsMenu = document.getElementById("menu-btn-settings");
+var btnSoundMenu = document.getElementById("menu-btn-sound");
+var menuSoundIcon = document.getElementById("menu-sound-icon");
+var questBtnMenu = document.getElementById("quest-btn-menu");
 var questBtnInv = document.getElementById("quest-btn-inv");
 var questBtnSound = document.getElementById("quest-btn-sound");
-var logContainer = document.getElementById("log-container");
-var controlsContainer = document.getElementById("controls-container");
+var questSoundIcon = document.getElementById("quest-sound-icon");
 var pointsRedVal = document.getElementById("points-red-val");
 var pointsBlueVal = document.getElementById("points-blue-val");
-var modalInventory = document.getElementById("modal-inventory");
+var logContainer = document.getElementById("log-container");
+var controlsContainer = document.getElementById("controls-container");
 var modalSettings = document.getElementById("modal-settings");
-var closeInventory = document.getElementById("close-inventory");
 var closeSettings = document.getElementById("close-settings");
-var inventoryList = document.getElementById("inventory-list");
+var sliderSfx = document.getElementById("slider-sfx");
+var sliderAmbient = document.getElementById("slider-ambient");
+var sfxValText = document.getElementById("val-sfx");
+var ambientValText = document.getElementById("val-ambient");
 var btnExport = document.getElementById("btn-export");
 var btnImport = document.getElementById("btn-import");
-var btnRestart = document.getElementById("btn-restart");
 var fileInput = document.getElementById("file-input");
+var btnRestart = document.getElementById("btn-restart");
+var modalInventory = document.getElementById("modal-inventory");
+var closeInventory = document.getElementById("close-inventory");
+var inventoryList = document.getElementById("inventory-list");
+var hubEpTitle = document.getElementById("hub-ep-title");
+var hubStoryTitle = document.getElementById("hub-story-title");
+var cardContainer = document.getElementById("card-container");
+var questNameEl = document.getElementById("quest-name");
+var questDescEl = document.getElementById("quest-desc");
+var btnPrevQuest = document.getElementById("btn-prev-quest");
+var btnNextQuest = document.getElementById("btn-next-quest");
+var hubActionContainer = document.getElementById("hub-action-container");
 var currentCarouselIndex = 0;
 var hubQuestsList = [];
-var sounds = new SoundManager();
-var initialState = loadStateFromLocal();
-var engine = new FogEngine(
-  initialState,
-  (state) => {
-    updateView(state);
-  },
-  (text, isChoice, pointChange) => {
-    appendLogMessage(text, isChoice, pointChange);
-  }
-);
-(async () => {
-  await engine.init();
-  const state = engine.getState();
-  updateView(state);
-})();
-function updateView(state) {
+var lastBackgroundPath = "";
+var peekTimeout = null;
+function renderApp(state) {
   updateBackground(state.currentBackground);
   updatePoints(state);
-  screenMenu.style.display = state.currentScreen === "menu" ? "flex" : "none";
-  screenHub.style.display = state.currentScreen === "story_hub" ? "flex" : "none";
-  screenQuest.style.display = state.currentScreen === "quest" ? "flex" : "none";
-  if (state.hasStartedSession) {
-    menuBtnContinue.style.display = "block";
-  } else {
-    menuBtnContinue.style.display = "none";
-  }
-  if (state.currentScreen === "story_hub") {
+  updateSoundIcons();
+  if (state.currentScreen === "menu") {
+    screenMenu.style.display = "flex";
+    screenHub.style.display = "none";
+    screenQuest.style.display = "none";
+    btnContinue.style.display = state.hasStartedSession ? "flex" : "none";
+  } else if (state.currentScreen === "story_hub") {
+    screenMenu.style.display = "none";
+    screenHub.style.display = "flex";
+    screenQuest.style.display = "none";
     renderHub(state);
   } else if (state.currentScreen === "quest") {
+    screenMenu.style.display = "none";
+    screenHub.style.display = "none";
+    screenQuest.style.display = "flex";
     renderQuest(state);
   }
 }
-var lastBackgroundPath = "";
-var peekTimeout = null;
 function updateBackground(bgPath) {
   if (!bgPath) return;
   const clean = bgPath.replace(/^Backgrounds\//, "").replace(/\.(png|jpg|webp)$/i, "");
   const url = `./assets/backgrounds/${clean}.webp`;
   if (bgPath !== lastBackgroundPath) {
     lastBackgroundPath = bgPath;
-    gameBg.style.backgroundImage = `url('${url}')`;
-    triggerTemporaryPeek(2e3);
+    const img = new Image();
+    img.src = url;
+    img.onload = () => {
+      gameBg.style.backgroundImage = `url('${url}')`;
+      triggerTemporaryPeek(1200);
+    };
+    img.onerror = () => {
+      gameBg.style.backgroundImage = `url('${url}')`;
+    };
   }
 }
-function triggerTemporaryPeek(durationMs = 2e3) {
+function triggerTemporaryPeek(durationMs = 1200) {
   document.body.classList.add("peeking");
   if (peekTimeout) clearTimeout(peekTimeout);
   peekTimeout = setTimeout(() => {
@@ -674,6 +751,12 @@ function triggerTemporaryPeek(durationMs = 2e3) {
 function updatePoints(state) {
   if (pointsRedVal) pointsRedVal.textContent = String(state.points.value_0 || 0);
   if (pointsBlueVal) pointsBlueVal.textContent = String(state.points.value_1 || 0);
+}
+function updateSoundIcons() {
+  const isMuted = sounds.getMuted();
+  const icon = isMuted ? "volume_off" : "volume_up";
+  if (menuSoundIcon) menuSoundIcon.textContent = icon;
+  if (questSoundIcon) questSoundIcon.textContent = icon;
 }
 function renderHub(state) {
   const epNames = {
@@ -688,41 +771,57 @@ function renderHub(state) {
   if (currentCarouselIndex >= hubQuestsList.length) {
     currentCarouselIndex = 0;
   }
-  const currentQ = hubQuestsList[currentCarouselIndex];
-  hubCardTitle.textContent = currentQ.name;
-  hubCardDesc.textContent = currentQ.desc || "\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435 \u043B\u043E\u043A\u0430\u0446\u0438\u0438...";
-  hubCardStatus.textContent = currentQ.isDone ? "\u0418\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u043E" : "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E";
-  hubCardStatus.style.color = currentQ.isDone ? "var(--color-fog-muted)" : "var(--color-fog-gold)";
-  let cardImgPath = "./assets/backgrounds/1.webp";
-  if (currentQ.cards && currentQ.cards.length > 0) {
-    const rawCard = String(currentQ.cards[0]).replace(/\\/g, "/").split("/").pop()?.replace(/\.(png|jpg|webp)$/i, "") || "";
-    if (rawCard) {
-      cardImgPath = `./assets/cards/${rawCard}.webp`;
-    }
-  } else if (state.currentBackground) {
-    const cleanBg = String(state.currentBackground).replace(/\\/g, "/").split("/").pop()?.replace(/\.(png|jpg|webp)$/i, "") || "1";
-    cardImgPath = `./assets/backgrounds/${cleanBg}.webp`;
-  }
-  hubCardImg.onerror = () => {
-    hubCardImg.src = "./assets/backgrounds/1.webp";
-  };
-  hubCardImg.src = cardImgPath;
-  hubBtnPrev.disabled = currentCarouselIndex === 0;
-  hubBtnNext.disabled = currentCarouselIndex >= hubQuestsList.length - 1;
-  const allStoryDone = hubQuestsList.every((q) => q.isDone);
-  if (allStoryDone) {
-    hubAdvanceBox.style.display = "block";
+  const q = hubQuestsList[currentCarouselIndex];
+  questNameEl.textContent = q.name;
+  questDescEl.textContent = q.desc;
+  cardContainer.innerHTML = "";
+  if (q.cards && q.cards.length > 0) {
+    const cardPath = q.cards[0].replace(/^Cards\//, "").replace(/\.(png|jpg|webp)$/i, "");
+    const img = document.createElement("img");
+    img.src = `./assets/cards/${cardPath}.webp`;
+    img.className = "w-full h-full object-cover rounded-lg shadow-xl";
+    img.alt = q.name;
+    img.onerror = () => {
+      img.src = "./favicon.png";
+    };
+    cardContainer.appendChild(img);
   } else {
-    hubAdvanceBox.style.display = "none";
+    cardContainer.innerHTML = `<div class="flex items-center justify-center h-full text-fog-muted text-sm font-serif">\u041B\u043E\u043A\u0430\u0446\u0438\u044F [${q.name}]</div>`;
   }
+  hubActionContainer.innerHTML = "";
+  const actionBtn = document.createElement("button");
+  actionBtn.className = "fog-btn-action w-full py-3 text-base";
+  actionBtn.innerHTML = `<span>\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u043F\u0443\u0442\u0435\u0448\u0435\u0441\u0442\u0432\u0438\u0435</span><span>\u2794</span>`;
+  actionBtn.addEventListener("click", () => {
+    sounds.playChoice();
+    engine.selectQuest(q.id);
+  });
+  hubActionContainer.appendChild(actionBtn);
 }
+btnPrevQuest.addEventListener("click", () => {
+  if (hubQuestsList.length <= 1) return;
+  sounds.playCards();
+  currentCarouselIndex = (currentCarouselIndex - 1 + hubQuestsList.length) % hubQuestsList.length;
+  renderHub(engine.getState());
+});
+btnNextQuest.addEventListener("click", () => {
+  if (hubQuestsList.length <= 1) return;
+  sounds.playCards();
+  currentCarouselIndex = (currentCarouselIndex + 1) % hubQuestsList.length;
+  renderHub(engine.getState());
+});
 function renderQuest(state) {
+  if (logContainer.children.length === 0 && state.history) {
+    for (const item of state.history) {
+      appendLogMessage(item.text, item.isChoice, item.pointChange);
+    }
+  }
   controlsContainer.innerHTML = "";
-  const currentLine = engine.getCurrentLine();
+  const currentLine = engine.getCurrentLineObj();
   if (!currentLine) {
     const btn = document.createElement("button");
-    btn.className = "fog-btn-action";
-    btn.innerHTML = `<span>\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0438\u0441\u0441\u043B\u0435\u0434\u043E\u0432\u0430\u043D\u0438\u0435</span><span>\u2794</span>`;
+    btn.className = "fog-btn-action animate-fade-in";
+    btn.innerHTML = `<span>\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u043F\u0443\u0442\u044C</span><span>\u2794</span>`;
     btn.addEventListener("click", () => {
       sounds.playButton();
       engine.finishCurrentQuest();
@@ -782,90 +881,51 @@ function appendLogMessage(text, isChoice = false, pointChange) {
     container.appendChild(badgesRow);
   }
   logContainer.appendChild(container);
-  window.scrollTo({
-    top: document.body.scrollHeight,
-    behavior: "smooth"
-  });
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
 }
-menuBtnStart.addEventListener("click", () => {
+btnStart.addEventListener("click", () => {
   sounds.playButton();
-  sounds.playAmbient();
+  sounds.playAmbient(1);
   engine.startNewGame();
 });
-menuBtnContinue.addEventListener("click", () => {
+btnContinue.addEventListener("click", () => {
   sounds.playButton();
-  sounds.playAmbient();
+  sounds.playAmbient(1);
   engine.continueGame();
 });
-menuBtnSettings.addEventListener("click", () => {
+btnSoundMenu.addEventListener("click", () => {
+  sounds.toggle();
+  updateSoundIcons();
+});
+questBtnSound.addEventListener("click", () => {
+  sounds.toggle();
+  updateSoundIcons();
+});
+questBtnMenu.addEventListener("click", () => {
   sounds.playButton();
   modalSettings.style.display = "flex";
 });
-hubBtnPrev.addEventListener("click", () => {
-  sounds.playCards();
-  if (currentCarouselIndex > 0) {
-    currentCarouselIndex--;
-    renderHub(engine.getState());
-  }
-});
-hubBtnNext.addEventListener("click", () => {
-  sounds.playCards();
-  if (currentCarouselIndex < hubQuestsList.length - 1) {
-    currentCarouselIndex++;
-    renderHub(engine.getState());
-  }
-});
-hubBtnStartQuest.addEventListener("click", () => {
+btnSettingsMenu.addEventListener("click", () => {
   sounds.playButton();
-  if (hubQuestsList[currentCarouselIndex]) {
-    engine.selectQuest(hubQuestsList[currentCarouselIndex].id);
-  }
+  modalSettings.style.display = "flex";
 });
-hubBtnAdvanceStory.addEventListener("click", () => {
-  sounds.playButton();
-  engine.advanceToNextStory();
-});
-hubBtnMenu.addEventListener("click", () => {
-  sounds.playButton();
-  engine.returnToMenu();
-});
-questBtnBackHub.addEventListener("click", () => {
-  sounds.playButton();
-  engine.returnToHub();
-});
-var hubSoundIcon = document.getElementById("hub-sound-icon");
-var questSoundIcon = document.getElementById("quest-sound-icon");
-var toggleSound = () => {
-  const active = sounds.toggle();
-  const iconName = active ? "volume_up" : "volume_off";
-  if (hubSoundIcon) hubSoundIcon.textContent = iconName;
-  if (questSoundIcon) questSoundIcon.textContent = iconName;
-};
-hubBtnSound.addEventListener("click", toggleSound);
-questBtnSound.addEventListener("click", toggleSound);
-var openInventory = () => {
+questBtnInv.addEventListener("click", () => {
   sounds.playInventory();
   renderInventory();
   modalInventory.style.display = "flex";
-};
-hubBtnInv.addEventListener("click", openInventory);
-questBtnInv.addEventListener("click", openInventory);
+});
 closeInventory.addEventListener("click", () => {
   sounds.playButton();
   modalInventory.style.display = "none";
 });
 function renderInventory() {
   inventoryList.innerHTML = "";
-  const inv = engine.getState().inventory;
+  const inv = engine.getState().inventory || {};
   const catalog = engine.getItemsCatalog();
   const commonRu = engine.getCommonRu();
   const entries = Object.entries(inv).filter(([_, count]) => count > 0);
   if (entries.length === 0) {
-    inventoryList.innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--color-fog-muted);font-size:0.85rem;">
-        \u0420\u044E\u043A\u0437\u0430\u043A \u043F\u0443\u0441\u0442. \u0418\u0441\u0441\u043B\u0435\u0434\u0443\u0439\u0442\u0435 \u043C\u0438\u0440 \u0438 \u0441\u043E\u0431\u0438\u0440\u0430\u0439\u0442\u0435 \u043F\u043E\u043B\u0435\u0437\u043D\u044B\u0435 \u043F\u0440\u0435\u0434\u043C\u0435\u0442\u044B.
-      </div>
-    `;
+    inventoryList.innerHTML = `<div class="col-span-full py-8 text-center text-sm text-fog-muted font-serif">\u0420\u044E\u043A\u0437\u0430\u043A \u043F\u0443\u0441\u0442. \u0418\u0441\u0441\u043B\u0435\u0434\u0443\u0439\u0442\u0435 \u043B\u043E\u043A\u0430\u0446\u0438\u0438, \u0447\u0442\u043E\u0431\u044B \u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u0438\u043F\u0430\u0441\u044B \u0438 \u0430\u0440\u0442\u0435\u0444\u0430\u043A\u0442\u044B.</div>`;
     return;
   }
   for (const [itemId, count] of entries) {
@@ -882,6 +942,25 @@ function renderInventory() {
     inventoryList.appendChild(card);
   }
 }
+function syncAudioSliders() {
+  const sfxPercent = Math.round(sounds.getSfxVolume() * 100);
+  const ambientPercent = Math.round(sounds.getAmbientVolume() * 100);
+  sliderSfx.value = String(sfxPercent);
+  sliderAmbient.value = String(ambientPercent);
+  sfxValText.textContent = `${sfxPercent}%`;
+  ambientValText.textContent = `${ambientPercent}%`;
+}
+sliderSfx.addEventListener("input", (e) => {
+  const val = Number(e.target.value);
+  sfxValText.textContent = `${val}%`;
+  sounds.setSfxVolume(val / 100);
+  sounds.playButton();
+});
+sliderAmbient.addEventListener("input", (e) => {
+  const val = Number(e.target.value);
+  ambientValText.textContent = `${val}%`;
+  sounds.setAmbientVolume(val / 100);
+});
 closeSettings.addEventListener("click", () => {
   sounds.playButton();
   modalSettings.style.display = "none";
@@ -947,3 +1026,7 @@ logContainer.addEventListener("touchstart", (e) => {
 }, { passive: true });
 logContainer.addEventListener("touchend", stopPeek);
 logContainer.addEventListener("touchcancel", stopPeek);
+engine.init().then(() => {
+  syncAudioSliders();
+  renderApp(engine.getState());
+});

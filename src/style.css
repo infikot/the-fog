@@ -651,3 +651,43 @@ body.peeking #screen-quest .fog-main {
   color: var(--color-fog-gold);
   margin-top: 0.25rem;
 }
+
+/* Audio Range Sliders */
+.fog-range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: var(--color-fog-surface-light);
+  border: 1px solid var(--color-fog-border);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.fog-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-fog-gold);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(197, 160, 89, 0.5);
+  border: 2px solid #07090c;
+  transition: transform 0.15s ease;
+}
+
+.fog-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.fog-range-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-fog-gold);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(197, 160, 89, 0.5);
+  border: 2px solid #07090c;
+}

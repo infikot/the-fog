@@ -28,7 +28,7 @@ export class FogEngine {
       this.state.currentStory = '0';
     }
     if (!this.state.points) {
-      this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0 };
+      this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0, good: 0, bad: 0 };
     }
     if (!this.state.inventory) {
       this.state.inventory = {};
@@ -61,17 +61,18 @@ export class FogEngine {
     this.state.hasStartedSession = true;
     this.state.currentEpisode = this.bundle.first_episode || 'nazareth';
     this.state.currentStory = '0';
-    this.state.currentQuestId = null;
+    this.state.currentQuestId = '0';
     this.state.currentLineId = 'Line_0';
     this.state.completedQuests = [];
     this.state.completedEpisodes = [];
     this.state.inventory = {};
-    this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0 };
+    this.state.points = { value_0: 0, value_1: 0, first: 0, second: 0, good: 0, bad: 0 };
     this.state.visitedLines = {};
     this.state.choiceHistory = [];
     this.state.history = [];
     this.state.currentBackground = 'Backgrounds/1';
-    this.state.currentScreen = 'story_hub';
+    this.state.currentScreen = 'quest';
+    this.processLine('Line_0');
     this.save();
   }
 
@@ -80,7 +81,15 @@ export class FogEngine {
       this.startNewGame();
       return;
     }
-    this.state.currentScreen = this.state.currentQuestId ? 'quest' : 'story_hub';
+    // Strictly continue where left off
+    if (!this.state.currentQuestId) {
+      // Find current active quest in the story
+      const story = this.getCurrentStoryObj();
+      const firstQ = Object.keys(story?.quests || {})[0] || '0';
+      this.selectQuest(firstQ);
+      return;
+    }
+    this.state.currentScreen = 'quest';
     this.save();
   }
 
@@ -89,43 +98,26 @@ export class FogEngine {
     this.save();
   }
 
-  public returnToHub(): void {
-    this.state.currentScreen = 'story_hub';
-    this.state.currentQuestId = null;
-    this.save();
+  public getCurrentEpisodeObj(): any {
+    return this.bundle?.episodes?.[this.state.currentEpisode];
   }
 
-  private getCurrentStoryObj(): any {
-    if (!this.bundle) return null;
-    return this.bundle.episodes?.[this.state.currentEpisode]?.stories?.[this.state.currentStory] || null;
+  public getCurrentStoryObj(): any {
+    const ep = this.getCurrentEpisodeObj();
+    return ep?.stories?.[this.state.currentStory];
   }
 
   public getCurrentQuestObj(): any {
     const story = this.getCurrentStoryObj();
     if (!story || !this.state.currentQuestId) return null;
-    return story.quests?.[this.state.currentQuestId] || null;
+    return story.quests?.[this.state.currentQuestId];
   }
 
-  public getCurrentLine(): GameLine | null {
+  public getCurrentLineObj(): GameLine | null {
     const quest = this.getCurrentQuestObj();
     if (!quest) return null;
     const lines = quest.graph?.lines || quest.lines;
-    if (!lines) return null;
-    return lines[this.state.currentLineId] || null;
-  }
-
-  public getChoiceText(textKey: string): string {
-    const quest = this.getCurrentQuestObj();
-    const story = this.getCurrentStoryObj();
-    const raw = (
-      quest?.texts?.[textKey]?.text ||
-      story?.texts?.[textKey]?.text ||
-      story?.texts?.ru?.[textKey]?.text ||
-      this.bundle?.all_texts?.[textKey]?.text ||
-      this.bundle?.common_texts?.[textKey]?.text ||
-      textKey
-    );
-    return raw.replace(/<\/?(?:i|b|color[^>]*|size[^>]*)>/gi, '').trim();
+    return lines?.[this.state.currentLineId] || null;
   }
 
   public getAvailableQuests(): Array<{ id: string; name: string; desc: string; cards: string[]; isDone: boolean }> {
@@ -161,7 +153,7 @@ export class FogEngine {
     this.state.currentQuestId = questId;
     this.state.currentLineId = 'Line_0';
     this.state.currentScreen = 'quest';
-    this.state.history = []; // Clear chat log for new quest run
+    this.state.history = []; // Clear chat on new quest start
     this.processLine('Line_0');
   }
 
@@ -173,78 +165,103 @@ export class FogEngine {
     if (currentStoryIndex !== -1 && currentStoryIndex < storyKeys.length - 1) {
       const nextStory = storyKeys[currentStoryIndex + 1];
       this.state.currentStory = nextStory;
-      this.state.currentQuestId = null;
-      this.state.currentScreen = 'story_hub';
+      const nextStoryObj = epData.stories[nextStory];
+      const firstQ = Object.keys(nextStoryObj?.quests || {})[0] || '0';
+      this.selectQuest(firstQ);
     } else {
-      // Episode completed
+      // Episode completed -> check next episode
       if (!this.state.completedEpisodes.includes(this.state.currentEpisode)) {
         this.state.completedEpisodes.push(this.state.currentEpisode);
       }
-      const epKeys = Object.keys(this.bundle.episodes || {});
-      const epIndex = epKeys.indexOf(this.state.currentEpisode);
-      if (epIndex !== -1 && epIndex < epKeys.length - 1) {
-        this.state.currentEpisode = epKeys[epIndex + 1];
+      const allEpisodes = Object.keys(this.bundle.episodes || {});
+      const currentEpIndex = allEpisodes.indexOf(this.state.currentEpisode);
+      if (currentEpIndex !== -1 && currentEpIndex < allEpisodes.length - 1) {
+        const nextEp = allEpisodes[currentEpIndex + 1];
+        this.state.currentEpisode = nextEp;
         this.state.currentStory = '0';
-        this.state.currentQuestId = null;
-        this.state.currentScreen = 'story_hub';
+        const nextEpObj = this.bundle.episodes[nextEp];
+        const nextStoryObj = nextEpObj?.stories?.['0'];
+        const firstQ = Object.keys(nextStoryObj?.quests || {})[0] || '0';
+        this.selectQuest(firstQ);
       } else {
-        this.state.gameFinished = true;
+        alert('Поздравляем! Вы прошли все доступные эпизоды игры «Туман»!');
+        this.returnToMenu();
       }
     }
     this.save();
   }
 
-  public step(): void {
-    const line = this.getCurrentLine();
-    if (!line) return;
+  public getChoiceText(textKey: string): string {
+    const quest = this.getCurrentQuestObj();
+    const texts = quest?.texts || {};
+    return texts[textKey]?.text || this.bundle?.common_texts?.[textKey]?.text || '';
+  }
 
-    for (const comp of Object.values(line.components)) {
-      if (comp.type === 'line_next' && comp.line) {
-        this.goToLine(comp.line);
-        return;
-      }
-      if (comp.type === 'line_next_points') {
-        const nextTarget = this.evaluateNextPoints(comp);
-        if (nextTarget) {
-          this.goToLine(nextTarget);
-          return;
-        }
-      }
-      if (comp.type === 'line_next_item') {
-        const nextTarget = this.evaluateNextItem(comp);
-        if (nextTarget) {
-          this.goToLine(nextTarget);
-          return;
-        }
-      }
-      if (comp.type === 'line_to_quests') {
-        this.finishCurrentQuest();
+  public step(): void {
+    const currentLine = this.getCurrentLineObj();
+    if (!currentLine) return;
+
+    const comps = Object.values(currentLine.components);
+
+    // 1. Line to quests (End of quest)
+    if (comps.some((c) => c.type === 'line_to_quests')) {
+      this.finishCurrentQuest();
+      return;
+    }
+
+    // 2. Conditional Branching by points (line_next_points)
+    const nextPointsComp = comps.find((c) => c.type === 'line_next_points');
+    if (nextPointsComp) {
+      const targetLine = this.evalPointsBranch(nextPointsComp);
+      if (targetLine) {
+        this.goToLine(targetLine);
         return;
       }
     }
+
+    // 3. Conditional Branching by items (line_next_item)
+    const nextItemComp = comps.find((c) => c.type === 'line_next_item');
+    if (nextItemComp) {
+      const targetLine = this.evalItemBranch(nextItemComp);
+      if (targetLine) {
+        this.goToLine(targetLine);
+        return;
+      }
+    }
+
+    // 4. Default next transition (line_next)
+    const nextComp = comps.find((c) => c.type === 'line_next' && c.line);
+    if (nextComp && nextComp.line) {
+      this.goToLine(nextComp.line);
+      return;
+    }
+
+    // If no direct transitions found, end quest
+    this.finishCurrentQuest();
   }
 
-  private evaluateNextPoints(comp: any): string | null {
+  private evalPointsBranch(comp: any): string | null {
     if (comp.comparers) {
-      const comparers = Object.values(comp.comparers) as any[];
-      for (const c of comparers) {
-        const pointKey = c.name === 'second' || c.name === 'value_1' ? 'value_1' : 'value_0';
-        const currentVal = this.state.points[pointKey] || 0;
-        const targetVal = c.value ?? 0;
-        const comparer = c.comparer ?? 0;
+      for (const c of Object.values(comp.comparers) as any[]) {
+        const pName = c.name;
+        // Map points to both raw name and normalized slot
+        const isBlue = pName === 'second' || pName === 'value_1' || pName === 'good';
+        const normKey = isBlue ? 'value_1' : 'value_0';
+        const val = this.state.points[pName] ?? this.state.points[normKey] ?? 0;
+        const target = c.value || 0;
+        let pass = false;
 
-        let matches = false;
-        switch (comparer) {
-          case 0: matches = currentVal === targetVal; break;
-          case 1: matches = currentVal !== targetVal; break;
-          case 2: matches = currentVal < targetVal; break;
-          case 3: matches = currentVal <= targetVal; break;
-          case 4: matches = currentVal >= targetVal; break;
-          case 5: matches = currentVal > targetVal; break;
-          default: matches = currentVal >= targetVal; break;
+        switch (c.comparer) {
+          case 0: pass = val === target; break; // Equal
+          case 1: pass = val !== target; break; // NotEqual
+          case 2: pass = val < target; break;   // Less
+          case 3: pass = val <= target; break;  // LessEqual
+          case 4: pass = val > target; break;   // Greater
+          case 5: pass = val >= target; break;  // GreaterEqual
+          default: pass = val >= target; break;
         }
 
-        if (matches && c.line) {
+        if (pass && c.line) {
           return c.line;
         }
       }
@@ -252,11 +269,12 @@ export class FogEngine {
     return comp.line || null;
   }
 
-  private evaluateNextItem(comp: any): string | null {
+  private evalItemBranch(comp: any): string | null {
     if (comp.comparers) {
-      const comparers = Object.values(comp.comparers) as any[];
-      for (const c of comparers) {
-        if (c.item && (this.state.inventory[c.item] || 0) > 0 && c.line) {
+      for (const c of Object.values(comp.comparers) as any[]) {
+        const item = c.item;
+        const hasItem = (this.state.inventory[item] || 0) > 0;
+        if (hasItem && c.line) {
           return c.line;
         }
       }
@@ -265,7 +283,6 @@ export class FogEngine {
   }
 
   public choose(choiceLine: string, choiceText: string): void {
-    // Track session choice history
     this.state.choiceHistory.push({
       episode: this.state.currentEpisode,
       story: this.state.currentStory,
@@ -292,7 +309,6 @@ export class FogEngine {
     const line = lines?.[lineId];
     if (!line) return;
 
-    // Record line visit in session tracking
     const fullLineKey = `${this.state.currentEpisode}_${this.state.currentStory}_${this.state.currentQuestId}_${lineId}`;
     this.state.visitedLines[fullLineKey] = true;
 
@@ -344,24 +360,16 @@ export class FogEngine {
     let blueDiff = 0;
 
     for (const mod of mods) {
-      const isBlue = mod.name === 'second' || mod.name === 'value_1';
+      const isBlue = mod.name === 'second' || mod.name === 'value_1' || mod.name === 'good';
       const key = isBlue ? 'value_1' : 'value_0';
       const current = this.state.points[key] || 0;
       let next = current;
 
       switch (mod.operator) {
-        case 0: // Set
-          next = mod.value;
-          break;
-        case 1: // Add
-          next = current + mod.value;
-          break;
-        case 2: // Sub
-          next = current - mod.value;
-          break;
-        default:
-          next = current + mod.value;
-          break;
+        case 0: next = mod.value; break; // Set
+        case 1: next = current + mod.value; break; // Add
+        case 2: next = current - mod.value; break; // Sub
+        default: next = current + mod.value; break;
       }
 
       const diff = next - current;
@@ -387,31 +395,17 @@ export class FogEngine {
       this.state.completedQuests.push(this.state.currentQuestId);
     }
 
-    // Return to story hub (original Unity logic)
-    this.state.currentScreen = 'story_hub';
-    this.state.currentQuestId = null;
-
     const story = this.getCurrentStoryObj();
-    const allStoryQuests = Object.keys(story?.quests || {});
-    const isStoryDone = allStoryQuests.length > 0 && allStoryQuests.every((q) => {
-      const fullK = `${this.state.currentEpisode}_${this.state.currentStory}_${q}`;
-      return this.state.completedQuests.includes(fullK) || this.state.completedQuests.includes(q);
-    });
+    const storyQuests = Object.keys(story?.quests || {});
+    const currentQIndex = storyQuests.indexOf(this.state.currentQuestId || '0');
 
-    if (isStoryDone) {
-      // Check if we can automatically advance story
-      const epData = this.bundle.episodes?.[this.state.currentEpisode];
-      const storyKeys = Object.keys(epData?.stories || {});
-      const currentStoryIndex = storyKeys.indexOf(this.state.currentStory);
-
-      if (currentStoryIndex !== -1 && currentStoryIndex < storyKeys.length - 1) {
-        // Next story available in hub
-      } else {
-        // Episode finished!
-        if (!this.state.completedEpisodes.includes(this.state.currentEpisode)) {
-          this.state.completedEpisodes.push(this.state.currentEpisode);
-        }
-      }
+    // If there is another quest in the same story, automatically go to it!
+    if (currentQIndex !== -1 && currentQIndex < storyQuests.length - 1) {
+      const nextQId = storyQuests[currentQIndex + 1];
+      this.selectQuest(nextQId);
+    } else {
+      // Story finished! Advance directly to next story
+      this.advanceToNextStory();
     }
 
     this.save();

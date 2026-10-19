@@ -1,124 +1,118 @@
 import { FogEngine } from './engine';
-import { loadStateFromLocal, exportSaveJSON, importSaveJSON } from './storage';
 import { SoundManager } from './sounds';
+import { loadStateFromLocal, exportSaveJSON, importSaveJSON } from './storage';
 import { GameState } from './types';
-import './style.css';
 
-// DOM Elements
-const screenMenu = document.getElementById('screen-menu') as HTMLElement;
-const screenHub = document.getElementById('screen-hub') as HTMLElement;
-const screenQuest = document.getElementById('screen-quest') as HTMLElement;
-
-// Background
-const gameBg = document.getElementById('game-bg') as HTMLElement;
-
-// Menu buttons
-const menuBtnStart = document.getElementById('menu-btn-start') as HTMLButtonElement;
-const menuBtnContinue = document.getElementById('menu-btn-continue') as HTMLButtonElement;
-const menuBtnSettings = document.getElementById('menu-btn-settings') as HTMLButtonElement;
-
-// Hub Elements
-const hubEpTitle = document.getElementById('hub-ep-title') as HTMLElement;
-const hubStoryTitle = document.getElementById('hub-story-title') as HTMLElement;
-const hubCardImg = document.getElementById('hub-card-img') as HTMLImageElement;
-const hubCardTitle = document.getElementById('hub-card-title') as HTMLElement;
-const hubCardDesc = document.getElementById('hub-card-desc') as HTMLElement;
-const hubCardStatus = document.getElementById('hub-card-status') as HTMLElement;
-const hubBtnPrev = document.getElementById('hub-btn-prev') as HTMLButtonElement;
-const hubBtnNext = document.getElementById('hub-btn-next') as HTMLButtonElement;
-const hubBtnStartQuest = document.getElementById('hub-btn-start-quest') as HTMLButtonElement;
-const hubAdvanceBox = document.getElementById('hub-advance-box') as HTMLElement;
-const hubBtnAdvanceStory = document.getElementById('hub-btn-advance-story') as HTMLButtonElement;
-const hubBtnMenu = document.getElementById('hub-btn-menu') as HTMLButtonElement;
-const hubBtnInv = document.getElementById('hub-btn-inv') as HTMLButtonElement;
-const hubBtnSound = document.getElementById('hub-btn-sound') as HTMLButtonElement;
-
-// Quest Elements
-const questBtnBackHub = document.getElementById('quest-btn-back-hub') as HTMLButtonElement;
-const questBtnInv = document.getElementById('quest-btn-inv') as HTMLButtonElement;
-const questBtnSound = document.getElementById('quest-btn-sound') as HTMLButtonElement;
-const logContainer = document.getElementById('log-container') as HTMLElement;
-const controlsContainer = document.getElementById('controls-container') as HTMLElement;
-const pointsRedVal = document.getElementById('points-red-val') as HTMLElement;
-const pointsBlueVal = document.getElementById('points-blue-val') as HTMLElement;
-
-// Modals
-const modalInventory = document.getElementById('modal-inventory') as HTMLElement;
-const modalSettings = document.getElementById('modal-settings') as HTMLElement;
-const closeInventory = document.getElementById('close-inventory') as HTMLButtonElement;
-const closeSettings = document.getElementById('close-settings') as HTMLButtonElement;
-const inventoryList = document.getElementById('inventory-list') as HTMLElement;
-const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
-const btnImport = document.getElementById('btn-import') as HTMLButtonElement;
-const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement;
-const fileInput = document.getElementById('file-input') as HTMLInputElement;
-
-// State & Engines
-let currentCarouselIndex = 0;
-let hubQuestsList: Array<{ id: string; name: string; desc: string; cards: string[]; isDone: boolean }> = [];
-
+// Initialize audio and engine
 const sounds = new SoundManager();
-const initialState = loadStateFromLocal();
-
 const engine = new FogEngine(
-  initialState,
-  (state) => {
-    updateView(state);
-  },
-  (text, isChoice, pointChange) => {
-    appendLogMessage(text, isChoice, pointChange);
-  }
+  loadStateFromLocal(),
+  (state) => renderApp(state),
+  (text, isChoice, pointChange) => appendLogMessage(text, isChoice, pointChange)
 );
 
-// Init Application
-(async () => {
-  await engine.init();
-  const state = engine.getState();
-  updateView(state);
-})();
+// UI Element References
+const screenMenu = document.getElementById('screen-menu')!;
+const screenHub = document.getElementById('screen-hub')!;
+const screenQuest = document.getElementById('screen-quest')!;
+const gameBg = document.getElementById('game-bg')!;
 
-// Global View Switcher
-function updateView(state: GameState): void {
+const btnStart = document.getElementById('menu-btn-start')!;
+const btnContinue = document.getElementById('menu-btn-continue')!;
+const btnSettingsMenu = document.getElementById('menu-btn-settings')!;
+const btnSoundMenu = document.getElementById('menu-btn-sound')!;
+const menuSoundIcon = document.getElementById('menu-sound-icon')!;
+
+const questBtnMenu = document.getElementById('quest-btn-menu')!;
+const questBtnInv = document.getElementById('quest-btn-inv')!;
+const questBtnSound = document.getElementById('quest-btn-sound')!;
+const questSoundIcon = document.getElementById('quest-sound-icon')!;
+
+const pointsRedVal = document.getElementById('points-red-val')!;
+const pointsBlueVal = document.getElementById('points-blue-val')!;
+const logContainer = document.getElementById('log-container')!;
+const controlsContainer = document.getElementById('controls-container')!;
+
+// Settings Modal & Audio Sliders
+const modalSettings = document.getElementById('modal-settings')!;
+const closeSettings = document.getElementById('close-settings')!;
+const sliderSfx = document.getElementById('slider-sfx') as HTMLInputElement;
+const sliderAmbient = document.getElementById('slider-ambient') as HTMLInputElement;
+const sfxValText = document.getElementById('val-sfx')!;
+const ambientValText = document.getElementById('val-ambient')!;
+const btnExport = document.getElementById('btn-export')!;
+const btnImport = document.getElementById('btn-import')!;
+const fileInput = document.getElementById('file-input') as HTMLInputElement;
+const btnRestart = document.getElementById('btn-restart')!;
+
+// Inventory Modal
+const modalInventory = document.getElementById('modal-inventory')!;
+const closeInventory = document.getElementById('close-inventory')!;
+const inventoryList = document.getElementById('inventory-list')!;
+
+// Hub Carousel Elements
+const hubEpTitle = document.getElementById('hub-ep-title')!;
+const hubStoryTitle = document.getElementById('hub-story-title')!;
+const cardContainer = document.getElementById('card-container')!;
+const questNameEl = document.getElementById('quest-name')!;
+const questDescEl = document.getElementById('quest-desc')!;
+const btnPrevQuest = document.getElementById('btn-prev-quest')!;
+const btnNextQuest = document.getElementById('btn-next-quest')!;
+const hubActionContainer = document.getElementById('hub-action-container')!;
+
+let currentCarouselIndex = 0;
+let hubQuestsList: Array<{ id: string; name: string; desc: string; cards: string[]; isDone: boolean }> = [];
+let lastBackgroundPath = '';
+let peekTimeout: any = null;
+
+// ========================================================
+// APP ROUTING & STATE RENDERER
+// ========================================================
+function renderApp(state: GameState): void {
   updateBackground(state.currentBackground);
   updatePoints(state);
+  updateSoundIcons();
 
-  // Toggle screens
-  screenMenu.style.display = state.currentScreen === 'menu' ? 'flex' : 'none';
-  screenHub.style.display = state.currentScreen === 'story_hub' ? 'flex' : 'none';
-  screenQuest.style.display = state.currentScreen === 'quest' ? 'flex' : 'none';
-
-  // Menu Continue button visibility
-  if (state.hasStartedSession) {
-    menuBtnContinue.style.display = 'block';
-  } else {
-    menuBtnContinue.style.display = 'none';
-  }
-
-  if (state.currentScreen === 'story_hub') {
+  if (state.currentScreen === 'menu') {
+    screenMenu.style.display = 'flex';
+    screenHub.style.display = 'none';
+    screenQuest.style.display = 'none';
+    btnContinue.style.display = state.hasStartedSession ? 'flex' : 'none';
+  } else if (state.currentScreen === 'story_hub') {
+    screenMenu.style.display = 'none';
+    screenHub.style.display = 'flex';
+    screenQuest.style.display = 'none';
     renderHub(state);
   } else if (state.currentScreen === 'quest') {
+    screenMenu.style.display = 'none';
+    screenHub.style.display = 'none';
+    screenQuest.style.display = 'flex';
     renderQuest(state);
   }
 }
-
-let lastBackgroundPath = '';
-let peekTimeout: any = null;
 
 function updateBackground(bgPath: string): void {
   if (!bgPath) return;
   const clean = bgPath.replace(/^Backgrounds\//, '').replace(/\.(png|jpg|webp)$/i, '');
   const url = `./assets/backgrounds/${clean}.webp`;
-  
+
   if (bgPath !== lastBackgroundPath) {
     lastBackgroundPath = bgPath;
-    gameBg.style.backgroundImage = `url('${url}')`;
-
-    // Trigger brief 2-second peek on background change so user can see new artwork
-    triggerTemporaryPeek(2000);
+    
+    // Preload image in memory so it's ready before revealing
+    const img = new Image();
+    img.src = url;
+    img.onload = () => {
+      gameBg.style.backgroundImage = `url('${url}')`;
+      triggerTemporaryPeek(1200);
+    };
+    img.onerror = () => {
+      gameBg.style.backgroundImage = `url('${url}')`;
+    };
   }
 }
 
-function triggerTemporaryPeek(durationMs: number = 2000): void {
+function triggerTemporaryPeek(durationMs: number = 1200): void {
   document.body.classList.add('peeking');
   if (peekTimeout) clearTimeout(peekTimeout);
   peekTimeout = setTimeout(() => {
@@ -130,6 +124,13 @@ function triggerTemporaryPeek(durationMs: number = 2000): void {
 function updatePoints(state: GameState): void {
   if (pointsRedVal) pointsRedVal.textContent = String(state.points.value_0 || 0);
   if (pointsBlueVal) pointsBlueVal.textContent = String(state.points.value_1 || 0);
+}
+
+function updateSoundIcons(): void {
+  const isMuted = sounds.getMuted();
+  const icon = isMuted ? 'volume_off' : 'volume_up';
+  if (menuSoundIcon) menuSoundIcon.textContent = icon;
+  if (questSoundIcon) questSoundIcon.textContent = icon;
 }
 
 // ========================================================
@@ -151,53 +152,66 @@ function renderHub(state: GameState): void {
     currentCarouselIndex = 0;
   }
 
-  const currentQ = hubQuestsList[currentCarouselIndex];
-  hubCardTitle.textContent = currentQ.name;
-  hubCardDesc.textContent = currentQ.desc || 'Продолжить исследование локации...';
-  hubCardStatus.textContent = currentQ.isDone ? 'Исследовано' : 'Доступно';
-  hubCardStatus.style.color = currentQ.isDone ? 'var(--color-fog-muted)' : 'var(--color-fog-gold)';
+  const q = hubQuestsList[currentCarouselIndex];
+  questNameEl.textContent = q.name;
+  questDescEl.textContent = q.desc;
 
-  // First card image or fallback
-  let cardImgPath = './assets/backgrounds/1.webp';
-  if (currentQ.cards && currentQ.cards.length > 0) {
-    const rawCard = String(currentQ.cards[0]).replace(/\\/g, '/').split('/').pop()?.replace(/\.(png|jpg|webp)$/i, '') || '';
-    if (rawCard) {
-      cardImgPath = `./assets/cards/${rawCard}.webp`;
-    }
-  } else if (state.currentBackground) {
-    const cleanBg = String(state.currentBackground).replace(/\\/g, '/').split('/').pop()?.replace(/\.(png|jpg|webp)$/i, '') || '1';
-    cardImgPath = `./assets/backgrounds/${cleanBg}.webp`;
-  }
-  hubCardImg.onerror = () => {
-    hubCardImg.src = './assets/backgrounds/1.webp';
-  };
-  hubCardImg.src = cardImgPath;
-
-  // Nav buttons
-  hubBtnPrev.disabled = currentCarouselIndex === 0;
-  hubBtnNext.disabled = currentCarouselIndex >= hubQuestsList.length - 1;
-
-  // Check if all quests in this story are completed
-  const allStoryDone = hubQuestsList.every((q) => q.isDone);
-  if (allStoryDone) {
-    hubAdvanceBox.style.display = 'block';
+  cardContainer.innerHTML = '';
+  if (q.cards && q.cards.length > 0) {
+    const cardPath = q.cards[0].replace(/^Cards\//, '').replace(/\.(png|jpg|webp)$/i, '');
+    const img = document.createElement('img');
+    img.src = `./assets/cards/${cardPath}.webp`;
+    img.className = 'w-full h-full object-cover rounded-lg shadow-xl';
+    img.alt = q.name;
+    img.onerror = () => { img.src = './favicon.png'; };
+    cardContainer.appendChild(img);
   } else {
-    hubAdvanceBox.style.display = 'none';
+    cardContainer.innerHTML = `<div class="flex items-center justify-center h-full text-fog-muted text-sm font-serif">Локация [${q.name}]</div>`;
   }
+
+  hubActionContainer.innerHTML = '';
+  const actionBtn = document.createElement('button');
+  actionBtn.className = 'fog-btn-action w-full py-3 text-base';
+  actionBtn.innerHTML = `<span>Продолжить путешествие</span><span>➔</span>`;
+  actionBtn.addEventListener('click', () => {
+    sounds.playChoice();
+    engine.selectQuest(q.id);
+  });
+  hubActionContainer.appendChild(actionBtn);
 }
 
+// Hub Arrow Buttons
+btnPrevQuest.addEventListener('click', () => {
+  if (hubQuestsList.length <= 1) return;
+  sounds.playCards();
+  currentCarouselIndex = (currentCarouselIndex - 1 + hubQuestsList.length) % hubQuestsList.length;
+  renderHub(engine.getState());
+});
+
+btnNextQuest.addEventListener('click', () => {
+  if (hubQuestsList.length <= 1) return;
+  sounds.playCards();
+  currentCarouselIndex = (currentCarouselIndex + 1) % hubQuestsList.length;
+  renderHub(engine.getState());
+});
+
 // ========================================================
-// 2. QUEST RENDERING (Story Log & Decisions)
+// 2. QUEST STORY RENDERING (Dialogue & Choices)
 // ========================================================
 function renderQuest(state: GameState): void {
-  controlsContainer.innerHTML = '';
-  const currentLine = engine.getCurrentLine();
+  // Restore log history if DOM is empty
+  if (logContainer.children.length === 0 && state.history) {
+    for (const item of state.history) {
+      appendLogMessage(item.text, item.isChoice, item.pointChange);
+    }
+  }
 
+  controlsContainer.innerHTML = '';
+  const currentLine = engine.getCurrentLineObj();
   if (!currentLine) {
-    // End of quest: Return button
     const btn = document.createElement('button');
-    btn.className = 'fog-btn-action';
-    btn.innerHTML = `<span>Завершить исследование</span><span>➔</span>`;
+    btn.className = 'fog-btn-action animate-fade-in';
+    btn.innerHTML = `<span>Продолжить путь</span><span>➔</span>`;
     btn.addEventListener('click', () => {
       sounds.playButton();
       engine.finishCurrentQuest();
@@ -268,96 +282,50 @@ function appendLogMessage(text: string, isChoice = false, pointChange?: { red?: 
   }
 
   logContainer.appendChild(container);
-
-  window.scrollTo({
-    top: document.body.scrollHeight,
-    behavior: 'smooth',
-  });
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
 
 // ========================================================
-// 3. LISTENERS & CONTROLS
+// 3. EVENT LISTENERS: Menu, Audio, Inventory, Settings
 // ========================================================
-
-// Main Menu
-menuBtnStart.addEventListener('click', () => {
+btnStart.addEventListener('click', () => {
   sounds.playButton();
-  sounds.playAmbient();
+  sounds.playAmbient(1);
   engine.startNewGame();
 });
 
-menuBtnContinue.addEventListener('click', () => {
+btnContinue.addEventListener('click', () => {
   sounds.playButton();
-  sounds.playAmbient();
+  sounds.playAmbient(1);
   engine.continueGame();
 });
 
-menuBtnSettings.addEventListener('click', () => {
+btnSoundMenu.addEventListener('click', () => {
+  sounds.toggle();
+  updateSoundIcons();
+});
+
+questBtnSound.addEventListener('click', () => {
+  sounds.toggle();
+  updateSoundIcons();
+});
+
+questBtnMenu.addEventListener('click', () => {
   sounds.playButton();
   modalSettings.style.display = 'flex';
 });
 
-// Hub Controls
-hubBtnPrev.addEventListener('click', () => {
-  sounds.playCards();
-  if (currentCarouselIndex > 0) {
-    currentCarouselIndex--;
-    renderHub(engine.getState());
-  }
-});
-
-hubBtnNext.addEventListener('click', () => {
-  sounds.playCards();
-  if (currentCarouselIndex < hubQuestsList.length - 1) {
-    currentCarouselIndex++;
-    renderHub(engine.getState());
-  }
-});
-
-hubBtnStartQuest.addEventListener('click', () => {
+btnSettingsMenu.addEventListener('click', () => {
   sounds.playButton();
-  if (hubQuestsList[currentCarouselIndex]) {
-    engine.selectQuest(hubQuestsList[currentCarouselIndex].id);
-  }
+  modalSettings.style.display = 'flex';
 });
 
-hubBtnAdvanceStory.addEventListener('click', () => {
-  sounds.playButton();
-  engine.advanceToNextStory();
-});
-
-hubBtnMenu.addEventListener('click', () => {
-  sounds.playButton();
-  engine.returnToMenu();
-});
-
-// Quest Top Bar
-questBtnBackHub.addEventListener('click', () => {
-  sounds.playButton();
-  engine.returnToHub();
-});
-
-// Sound toggles
-const hubSoundIcon = document.getElementById('hub-sound-icon') as HTMLElement;
-const questSoundIcon = document.getElementById('quest-sound-icon') as HTMLElement;
-
-const toggleSound = () => {
-  const active = sounds.toggle();
-  const iconName = active ? 'volume_up' : 'volume_off';
-  if (hubSoundIcon) hubSoundIcon.textContent = iconName;
-  if (questSoundIcon) questSoundIcon.textContent = iconName;
-};
-hubBtnSound.addEventListener('click', toggleSound);
-questBtnSound.addEventListener('click', toggleSound);
-
-// Inventory Modals
-const openInventory = () => {
+questBtnInv.addEventListener('click', () => {
   sounds.playInventory();
   renderInventory();
   modalInventory.style.display = 'flex';
-};
-hubBtnInv.addEventListener('click', openInventory);
-questBtnInv.addEventListener('click', openInventory);
+});
+
 closeInventory.addEventListener('click', () => {
   sounds.playButton();
   modalInventory.style.display = 'none';
@@ -365,18 +333,13 @@ closeInventory.addEventListener('click', () => {
 
 function renderInventory(): void {
   inventoryList.innerHTML = '';
-  const inv = engine.getState().inventory;
+  const inv = engine.getState().inventory || {};
   const catalog = engine.getItemsCatalog();
   const commonRu = engine.getCommonRu();
 
   const entries = Object.entries(inv).filter(([_, count]) => count > 0);
-
   if (entries.length === 0) {
-    inventoryList.innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--color-fog-muted);font-size:0.85rem;">
-        Рюкзак пуст. Исследуйте мир и собирайте полезные предметы.
-      </div>
-    `;
+    inventoryList.innerHTML = `<div class="col-span-full py-8 text-center text-sm text-fog-muted font-serif">Рюкзак пуст. Исследуйте локации, чтобы найти припасы и артефакты.</div>`;
     return;
   }
 
@@ -395,7 +358,29 @@ function renderInventory(): void {
   }
 }
 
-// Settings Modal
+// Settings Audio Sliders Sync
+function syncAudioSliders(): void {
+  const sfxPercent = Math.round(sounds.getSfxVolume() * 100);
+  const ambientPercent = Math.round(sounds.getAmbientVolume() * 100);
+  sliderSfx.value = String(sfxPercent);
+  sliderAmbient.value = String(ambientPercent);
+  sfxValText.textContent = `${sfxPercent}%`;
+  ambientValText.textContent = `${ambientPercent}%`;
+}
+
+sliderSfx.addEventListener('input', (e) => {
+  const val = Number((e.target as HTMLInputElement).value);
+  sfxValText.textContent = `${val}%`;
+  sounds.setSfxVolume(val / 100);
+  sounds.playButton();
+});
+
+sliderAmbient.addEventListener('input', (e) => {
+  const val = Number((e.target as HTMLInputElement).value);
+  ambientValText.textContent = `${val}%`;
+  sounds.setAmbientVolume(val / 100);
+});
+
 closeSettings.addEventListener('click', () => {
   sounds.playButton();
   modalSettings.style.display = 'none';
@@ -467,7 +452,6 @@ logContainer.addEventListener('mouseup', stopPeek);
 logContainer.addEventListener('mouseleave', stopPeek);
 
 logContainer.addEventListener('touchstart', (e) => {
-  // Check if click was on interactive button/link
   const target = e.target as HTMLElement;
   if (target && target.closest('button, a, input')) return;
   startPeek();
@@ -475,3 +459,9 @@ logContainer.addEventListener('touchstart', (e) => {
 
 logContainer.addEventListener('touchend', stopPeek);
 logContainer.addEventListener('touchcancel', stopPeek);
+
+// Launch engine
+engine.init().then(() => {
+  syncAudioSliders();
+  renderApp(engine.getState());
+});
