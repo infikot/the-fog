@@ -18,8 +18,10 @@ export interface LineComponent {
   background?: string;
   audio?: string;
   delay?: number;
+  item?: string;
   items?: Record<string, ChoiceItem>;
   modifiers?: Record<string, PointModifier>;
+  comparers?: Record<string, any>;
   conditions?: Record<string, any>;
   cards?: Record<string, { path: string }>;
 }
@@ -30,38 +32,6 @@ export interface GameLine {
   components: Record<string, LineComponent>;
 }
 
-export interface QuestNode {
-  lines: Record<string, GameLine>;
-  texts?: {
-    ru?: {
-      path: string;
-    };
-  };
-  backgrounds?: Record<string, { path: string }>;
-}
-
-export interface QuestInfo {
-  id: string;
-  path: string;
-  name: string;
-  desc: string;
-  cards: string[];
-}
-
-export interface StoryInfo {
-  id: string;
-  nextStory?: string;
-  quests: QuestInfo[];
-}
-
-export interface EpisodeInfo {
-  id: string;
-  title: string;
-  stories: string[];
-  lastStory: string;
-  nextEpisode?: string | null;
-}
-
 export interface GameState {
   currentEpisode: string;
   currentStory: string;
@@ -70,11 +40,15 @@ export interface GameState {
   completedQuests: string[];
   completedEpisodes: string[];
   inventory: Record<string, number>;
-  points: Record<string, number>;
+  points: {
+    value_0: number; // Red (Сила / Агрессия / Выживание)
+    value_1: number; // Blue (Рассудок / Мораль / Наблюдательность)
+    [key: string]: number;
+  };
   history: Array<{
     text: string;
     isChoice?: boolean;
-    speaker?: string;
+    pointChange?: { red?: number; blue?: number };
   }>;
   currentBackground: string;
   isEpisodeFinished?: boolean;

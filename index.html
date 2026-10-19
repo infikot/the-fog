@@ -16,11 +16,27 @@
 
     <!-- Header -->
     <header class="fog-header">
-      <div style="display:flex;align-items:center;">
-        <span class="fog-title">ТУМАН</span>
-        <span id="status-indicator" class="fog-badge">Назарет</span>
-      </div>
       <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span class="fog-title">ТУМАН</span>
+        <button id="ep-btn" class="fog-badge" title="Сменить главу">Назарет</button>
+      </div>
+
+      <!-- Moral & Status Indicators (Red & Blue Points) -->
+      <div class="fog-points-bar">
+        <div class="fog-point-item red" title="Сила / Агрессия / Выживание">
+          <span class="point-dot red"></span>
+          <span class="point-label">СИЛА</span>
+          <span id="points-red-val" class="point-val">0</span>
+        </div>
+        <div class="fog-point-item blue" title="Рассудок / Человечность / Мораль">
+          <span class="point-dot blue"></span>
+          <span class="point-label">РАССУДОК</span>
+          <span id="points-blue-val" class="point-val">0</span>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:0.4rem;">
+        <button id="inv-toggle" class="fog-btn-icon" title="Инвентарь">🎒</button>
         <button id="sound-toggle" class="fog-btn-icon" title="Звук">🔊</button>
         <button id="menu-toggle" class="fog-btn-menu">Меню</button>
       </div>
@@ -40,15 +56,41 @@
       </div>
     </footer>
 
+    <!-- Inventory Modal Dialog -->
+    <div id="modal-inventory" class="fog-modal-backdrop" style="display:none;">
+      <div class="fog-modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-fog-border);padding-bottom:0.75rem;margin-bottom:0.75rem;">
+          <span class="fog-modal-title">Инвентарь</span>
+          <button id="close-inventory" class="fog-close-btn">✕</button>
+        </div>
+        <div id="inventory-list" class="inventory-grid">
+          <!-- Item Cards -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Episodes / Chapters Modal -->
+    <div id="modal-episodes" class="fog-modal-backdrop" style="display:none;">
+      <div class="fog-modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-fog-border);padding-bottom:0.75rem;margin-bottom:0.75rem;">
+          <span class="fog-modal-title">Главы путешествия</span>
+          <button id="close-episodes" class="fog-close-btn">✕</button>
+        </div>
+        <div id="episodes-list" style="display:flex;flex-direction:column;gap:0.5rem;">
+          <!-- Episodes -->
+        </div>
+      </div>
+    </div>
+
     <!-- Save/Load Modal Dialog -->
     <div id="modal-menu" class="fog-modal-backdrop" style="display:none;">
       <div class="fog-modal-box">
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--color-fog-border);padding-bottom:0.75rem;margin-bottom:0.75rem;">
-          <span class="fog-modal-title">Сохранения</span>
-          <button id="close-menu" style="background:none;border:none;color:var(--color-fog-muted);font-size:1.1rem;cursor:pointer;">✕</button>
+          <span class="fog-modal-title">Настройки и сейвы</span>
+          <button id="close-menu" class="fog-close-btn">✕</button>
         </div>
         <p style="font-size:0.78rem;color:var(--color-fog-muted);line-height:1.5;margin-bottom:0.75rem;">
-          Прогресс непрерывно сохраняется в локальной базе браузера (IndexedDB/localStorage).
+          Каждое ваше решение мгновенно сохраняется в кэше устройства.
         </p>
         <div style="display:flex;flex-direction:column;gap:0.25rem;">
           <button id="btn-export" class="fog-modal-btn">
@@ -61,7 +103,7 @@
           </button>
           <input type="file" id="file-input" accept=".json" style="display:none;" />
           <button id="btn-restart" class="fog-modal-btn" style="color:#f87171;border-color:rgba(239,68,68,0.3);margin-top:0.75rem;">
-            <span>Начать заново</span>
+            <span>Начать заново с Пролога</span>
             <span>⚠️</span>
           </button>
         </div>

@@ -16,8 +16,8 @@ export function getDefaultState(): GameState {
     points: {
       value_0: 0,
       value_1: 0,
-      value_2: 0,
-      value_3: 0,
+      first: 0,
+      second: 0,
     },
     history: [],
     currentBackground: 'Backgrounds/1',
@@ -37,7 +37,14 @@ export function loadStateFromLocal(): GameState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!parsed.points) {
+        parsed.points = { value_0: 0, value_1: 0 };
+      }
+      if (parsed.points.value_0 === undefined) parsed.points.value_0 = parsed.points.first || 0;
+      if (parsed.points.value_1 === undefined) parsed.points.value_1 = parsed.points.second || 0;
+      if (!parsed.inventory) parsed.inventory = {};
+      return parsed;
     }
   } catch (e) {
     console.error('Failed to parse state from localStorage:', e);
@@ -99,6 +106,8 @@ export function importSaveJSON(jsonStr: string): GameState | null {
   try {
     const parsed = JSON.parse(jsonStr);
     if (parsed && parsed.currentEpisode && parsed.currentStory) {
+      if (!parsed.points) parsed.points = { value_0: 0, value_1: 0 };
+      if (!parsed.inventory) parsed.inventory = {};
       return parsed;
     }
   } catch (e) {
