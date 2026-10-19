@@ -21,18 +21,15 @@ let engine: FogEngine;
 function updateBackground(bgPath: string) {
   if (!bgPath) return;
   const normalized = bgPath.toLowerCase().replace(/^backgrounds\//i, '');
-  bgElement.style.backgroundImage = `url(./backgrounds/${normalized}.webp)`;
+  bgElement.style.backgroundImage = `url(./assets/backgrounds/${normalized}.webp)`;
 }
 
 function appendLogMessage(text: string, isChoice = false) {
   const p = document.createElement('p');
-  p.className = isChoice
-    ? 'text-fog-gold italic my-3 border-l-2 border-fog-gold/50 pl-3 leading-relaxed text-sm md:text-base'
-    : 'text-fog-text/90 my-2 leading-relaxed text-sm md:text-base font-normal tracking-wide animate-fade-in';
+  p.className = isChoice ? 'story-choice-echo animate-fade-in' : 'story-line animate-fade-in';
   p.innerHTML = text.replace(/\n/g, '<br/>');
   logContainer.appendChild(p);
 
-  // Auto-scroll to bottom smoothly
   window.scrollTo({
     top: document.body.scrollHeight,
     behavior: 'smooth',
@@ -45,12 +42,20 @@ function renderControls() {
   const state = engine.getState();
   const currentLine = engine.getCurrentLine();
 
+  // Update Episode status in header
+  const epNames: Record<string, string> = {
+    nazareth: 'Назарет',
+    virsavia: 'Вирсавия',
+    gilgal: 'Галгал',
+  };
+  statusIndicator.textContent = epNames[state.currentEpisode] || state.currentEpisode;
+
   if (state.gameFinished) {
     controlsContainer.innerHTML = `
-      <div class="text-center p-6 bg-fog-surface/80 rounded-lg border border-fog-accent/30">
-        <h2 class="text-2xl font-serif text-fog-gold mb-2">ФИНАЛ</h2>
-        <p class="text-fog-text/80 text-sm mb-4">Вы прошли сквозь все испытания Тумана.</p>
-        <button id="btn-final-restart" class="px-6 py-2 bg-fog-accent hover:bg-fog-accent/80 text-white rounded text-sm transition">Начать сначала</button>
+      <div style="text-align:center;padding:1.5rem;background:var(--color-fog-surface);border:1px solid var(--color-fog-border);border-radius:8px;">
+        <h2 style="font-family:var(--font-serif);color:var(--color-fog-gold);font-size:1.4rem;margin-bottom:0.5rem;">ФИНАЛ</h2>
+        <p style="color:var(--color-fog-muted);font-size:0.85rem;margin-bottom:1rem;">Вы прошли сквозь все испытания Тумана.</p>
+        <button id="btn-final-restart" class="fog-btn-action">Начать сначала</button>
       </div>
     `;
     document.getElementById('btn-final-restart')?.addEventListener('click', () => {
@@ -59,38 +64,47 @@ function renderControls() {
     return;
   }
 
-  // If in quest hub (no active quest or between quests)
+  // Quest hub (if no active quest)
   if (!state.currentQuestId) {
     const quests = engine.getAvailableQuests();
-    const title = document.createElement('h3');
-    title.className = 'text-xs uppercase tracking-widest text-fog-muted mb-3 font-semibold';
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:0.75rem;text-transform:uppercase;letter-spacing:0.15em;color:var(--color-fog-muted);margin-bottom:0.75rem;font-weight:600;';
     title.textContent = 'Доступные пути:';
     controlsContainer.appendChild(title);
 
     const grid = document.createElement('div');
-    grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-3';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:0.75rem;';
 
     for (const q of quests) {
       const isDone = state.completedQuests.includes(q.id);
       const card = document.createElement('button');
-      card.className = `p-4 text-left rounded border transition flex flex-col justify-between ${
-        isDone
-          ? 'bg-fog-surface/40 border-fog-border/30 opacity-60 cursor-not-allowed'
-          : 'bg-fog-surface/90 hover:bg-fog-surface border-fog-border hover:border-fog-gold/60 shadow-lg'
-      }`;
+      card.style.cssText = `
+        padding: 1rem;
+        text-align: left;
+        border-radius: 6px;
+        border: 1px solid ${isDone ? 'rgba(35,42,53,0.4)' : 'var(--color-fog-border)'};
+        background: ${isDone ? 'rgba(20,24,31,0.4)' : 'var(--color-fog-surface)'};
+        opacity: ${isDone ? '0.5' : '1'};
+        cursor: ${isDone ? 'not-allowed' : 'pointer'};
+        transition: all 0.2s ease;
+      `;
       card.disabled = isDone;
 
       card.innerHTML = `
-        <div>
-          <div class="text-fog-gold font-medium text-base mb-1">${q.name}</div>
-          <div class="text-fog-muted text-xs line-clamp-2">${q.desc || 'Продолжить исследование...'}</div>
-        </div>
-        <div class="text-[10px] mt-2 tracking-wider ${isDone ? 'text-fog-muted' : 'text-fog-gold/80'} uppercase">
+        <div style="color:var(--color-fog-gold);font-weight:600;font-size:0.95rem;margin-bottom:0.25rem;">${q.name}</div>
+        <div style="color:var(--color-fog-muted);font-size:0.8rem;line-height:1.4;">${q.desc || 'Продолжить исследование...'}</div>
+        <div style="font-size:0.65rem;margin-top:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:${isDone ? 'var(--color-fog-muted)' : 'var(--color-fog-gold)'}">
           ${isDone ? '[Исследовано]' : '[Отправиться]'}
         </div>
       `;
 
       if (!isDone) {
+        card.addEventListener('mouseenter', () => {
+          card.style.borderColor = 'var(--color-fog-gold)';
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.borderColor = 'var(--color-fog-border)';
+        });
         card.addEventListener('click', () => {
           sounds.playAmbient();
           engine.selectQuest(q.id);
@@ -117,21 +131,18 @@ function renderControls() {
 
   if (choiceComponent) {
     const list = document.createElement('div');
-    list.className = 'flex flex-col gap-2.5 w-full';
+    list.style.cssText = 'display:flex;flex-direction:column;width:100%;';
 
     const items = Object.values(choiceComponent.items) as any[];
     for (const it of items) {
-      const questTexts = (engine as any).currentQuestData?.texts?.ru;
-      const rawText = questTexts?.[it.text]?.text || engine.getCommonRu()?.[it.text]?.text || it.text;
+      const currentQuest = (engine as any).getCurrentQuestObj();
+      const rawText = currentQuest?.texts?.[it.text]?.text || engine.getCommonRu()?.[it.text]?.text || it.text;
 
-      // Extract text from quest ru if exists
       const btn = document.createElement('button');
-      btn.className =
-        'p-3.5 bg-fog-surface/90 hover:bg-fog-surface hover:border-fog-gold/70 border border-fog-border rounded text-fog-text text-sm md:text-base text-left transition shadow-md flex items-center justify-between group';
-
+      btn.className = 'fog-btn-choice';
       btn.innerHTML = `
-        <span class="group-hover:text-fog-gold transition">${rawText}</span>
-        <span class="text-fog-muted group-hover:text-fog-gold transition text-xs">➔</span>
+        <span>${rawText}</span>
+        <span class="choice-arrow">➔</span>
       `;
 
       btn.addEventListener('click', () => {
@@ -144,14 +155,12 @@ function renderControls() {
 
     controlsContainer.appendChild(list);
   } else {
-    // Single Next Step Button
+    // Next step button
     const btn = document.createElement('button');
-    btn.className =
-      'w-full py-3.5 px-6 bg-fog-surface/90 hover:bg-fog-surface border border-fog-border hover:border-fog-gold/60 rounded text-fog-gold text-sm tracking-widest uppercase font-medium transition shadow-md flex items-center justify-center gap-2 group';
-
+    btn.className = 'fog-btn-action';
     btn.innerHTML = `
       <span>Продолжить</span>
-      <span class="group-hover:translate-x-1 transition text-xs">➔</span>
+      <span style="font-size:0.8rem;">➔</span>
     `;
 
     btn.addEventListener('click', () => {
@@ -179,15 +188,14 @@ async function start() {
 
   await engine.init();
 
-  // Render previous history
   const state = engine.getState();
   if (state.history.length > 0) {
     for (const h of state.history) {
       appendLogMessage(h.text, h.isChoice);
     }
   } else {
-    // Initial start: process Line_0
-    engine.step();
+    // Process initial Line_0
+    engine.processLine('Line_0');
   }
 
   updateBackground(state.currentBackground);
@@ -200,13 +208,11 @@ async function start() {
   });
 
   menuToggle.addEventListener('click', () => {
-    modalMenu.classList.remove('hidden');
-    modalMenu.classList.add('flex');
+    modalMenu.style.display = 'flex';
   });
 
   closeMenu.addEventListener('click', () => {
-    modalMenu.classList.add('hidden');
-    modalMenu.classList.remove('flex');
+    modalMenu.style.display = 'none';
   });
 
   btnRestart.addEventListener('click', () => {
