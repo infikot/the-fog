@@ -101,11 +101,30 @@ function updateView(state: GameState): void {
   }
 }
 
+let lastBackgroundPath = '';
+let peekTimeout: any = null;
+
 function updateBackground(bgPath: string): void {
   if (!bgPath) return;
   const clean = bgPath.replace(/^Backgrounds\//, '').replace(/\.(png|jpg|webp)$/i, '');
   const url = `./assets/backgrounds/${clean}.webp`;
-  gameBg.style.backgroundImage = `url('${url}')`;
+  
+  if (bgPath !== lastBackgroundPath) {
+    lastBackgroundPath = bgPath;
+    gameBg.style.backgroundImage = `url('${url}')`;
+
+    // Trigger brief 2-second peek on background change so user can see new artwork
+    triggerTemporaryPeek(2000);
+  }
+}
+
+function triggerTemporaryPeek(durationMs: number = 2000): void {
+  document.body.classList.add('peeking');
+  if (peekTimeout) clearTimeout(peekTimeout);
+  peekTimeout = setTimeout(() => {
+    document.body.classList.remove('peeking');
+    peekTimeout = null;
+  }, durationMs);
 }
 
 function updatePoints(state: GameState): void {
@@ -199,7 +218,7 @@ function renderQuest(state: GameState): void {
       choiceBtn.textContent = choiceText;
 
       choiceBtn.addEventListener('click', () => {
-        sounds.playButton();
+        sounds.playChoice();
         engine.choose(item.line, choiceText);
       });
       controlsContainer.appendChild(choiceBtn);
@@ -229,21 +248,23 @@ function appendLogMessage(text: string, isChoice = false, pointChange?: { red?: 
   container.className = isChoice ? 'story-choice-echo animate-fade-in' : 'story-line animate-fade-in';
   container.textContent = text;
 
-  if (pointChange) {
+  if (pointChange && (pointChange.red || pointChange.blue)) {
+    const badgesRow = document.createElement('div');
+    badgesRow.className = 'point-badges-row';
+
     if (pointChange.red) {
       const r = document.createElement('span');
       r.className = 'point-badge-change red';
-      r.textContent = `${pointChange.red > 0 ? '+' : ''}${pointChange.red} Сила`;
-      container.appendChild(document.createElement('br'));
-      container.appendChild(r);
+      r.textContent = `${pointChange.red > 0 ? '+' : ''}${pointChange.red}`;
+      badgesRow.appendChild(r);
     }
     if (pointChange.blue) {
       const b = document.createElement('span');
       b.className = 'point-badge-change blue';
-      b.textContent = `${pointChange.blue > 0 ? '+' : ''}${pointChange.blue} Рассудок`;
-      container.appendChild(document.createElement('br'));
-      container.appendChild(b);
+      b.textContent = `${pointChange.blue > 0 ? '+' : ''}${pointChange.blue}`;
+      badgesRow.appendChild(b);
     }
+    container.appendChild(badgesRow);
   }
 
   logContainer.appendChild(container);
@@ -278,7 +299,7 @@ menuBtnSettings.addEventListener('click', () => {
 
 // Hub Controls
 hubBtnPrev.addEventListener('click', () => {
-  sounds.playButton();
+  sounds.playCards();
   if (currentCarouselIndex > 0) {
     currentCarouselIndex--;
     renderHub(engine.getState());
@@ -286,7 +307,7 @@ hubBtnPrev.addEventListener('click', () => {
 });
 
 hubBtnNext.addEventListener('click', () => {
-  sounds.playButton();
+  sounds.playCards();
   if (currentCarouselIndex < hubQuestsList.length - 1) {
     currentCarouselIndex++;
     renderHub(engine.getState());
@@ -331,7 +352,7 @@ questBtnSound.addEventListener('click', toggleSound);
 
 // Inventory Modals
 const openInventory = () => {
-  sounds.playButton();
+  sounds.playInventory();
   renderInventory();
   modalInventory.style.display = 'flex';
 };
@@ -420,3 +441,37 @@ btnRestart.addEventListener('click', () => {
     engine.restartGame();
   }
 });
+
+// ========================================================
+// 4. LONG PRESS TO PEEK BACKGROUND (Transparent UI)
+// ========================================================
+let isPressing = false;
+
+const startPeek = () => {
+  isPressing = true;
+  if (peekTimeout) {
+    clearTimeout(peekTimeout);
+    peekTimeout = null;
+  }
+  document.body.classList.add('peeking');
+};
+
+const stopPeek = () => {
+  if (!isPressing) return;
+  isPressing = false;
+  document.body.classList.remove('peeking');
+};
+
+logContainer.addEventListener('mousedown', startPeek);
+logContainer.addEventListener('mouseup', stopPeek);
+logContainer.addEventListener('mouseleave', stopPeek);
+
+logContainer.addEventListener('touchstart', (e) => {
+  // Check if click was on interactive button/link
+  const target = e.target as HTMLElement;
+  if (target && target.closest('button, a, input')) return;
+  startPeek();
+}, { passive: true });
+
+logContainer.addEventListener('touchend', stopPeek);
+logContainer.addEventListener('touchcancel', stopPeek);

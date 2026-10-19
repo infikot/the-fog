@@ -322,8 +322,10 @@ html, body {
 }
 
 .fog-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 30;
   background: rgba(7, 9, 12, 0.88);
   backdrop-filter: blur(12px);
@@ -334,6 +336,8 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  max-width: 44rem;
+  margin: 0 auto;
 }
 
 .fog-header-left {
@@ -432,7 +436,18 @@ html, body {
 /* Story Log Content */
 .fog-main {
   flex: 1;
-  padding: 1.25rem 1rem 12rem;
+  padding: 5rem 1rem 14rem;
+  transition: opacity 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.peeking #screen-quest .fog-header,
+body.peeking #screen-quest .fog-footer,
+body.peeking #screen-quest .fog-main {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.25s ease;
 }
 
 .story-line {
@@ -441,7 +456,6 @@ html, body {
   font-size: 0.98rem;
   letter-spacing: 0.015em;
   color: rgba(226, 232, 240, 0.92);
-  user-select: text;
 }
 
 @media (min-width: 640px) {
@@ -461,26 +475,27 @@ html, body {
   background: rgba(197, 160, 89, 0.04);
 }
 
-.point-badge-change {
-  display: inline-flex;
+.point-badges-row {
+  display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
+  gap: 0.6rem;
   margin-top: 0.35rem;
 }
+
+.point-badge-change {
+  display: inline-block;
+  font-family: var(--font-serif);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
 .point-badge-change.red {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #f87171;
+  color: #ef4444;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
 }
 .point-badge-change.blue {
-  background: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  color: #7dd3fc;
+  color: #38bdf8;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
 }
 
 /* Footer / Controls */

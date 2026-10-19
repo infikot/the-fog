@@ -117,7 +117,7 @@ export class FogEngine {
   public getChoiceText(textKey: string): string {
     const quest = this.getCurrentQuestObj();
     const story = this.getCurrentStoryObj();
-    return (
+    const raw = (
       quest?.texts?.[textKey]?.text ||
       story?.texts?.[textKey]?.text ||
       story?.texts?.ru?.[textKey]?.text ||
@@ -125,6 +125,7 @@ export class FogEngine {
       this.bundle?.common_texts?.[textKey]?.text ||
       textKey
     );
+    return raw.replace(/<\/?(?:i|b|color[^>]*|size[^>]*)>/gi, '').trim();
   }
 
   public getAvailableQuests(): Array<{ id: string; name: string; desc: string; cards: string[]; isDone: boolean }> {
@@ -328,8 +329,9 @@ export class FogEngine {
         const questTexts = quest.texts;
         const rawText = questTexts?.[comp.text]?.text || this.bundle?.common_texts?.[comp.text]?.text;
         if (rawText) {
+          const cleanText = rawText.replace(/<\/?(?:i|b|color[^>]*|size[^>]*)>/gi, '').trim();
           const pointChange = (redChange !== 0 || blueChange !== 0) ? { red: redChange, blue: blueChange } : undefined;
-          this.log(rawText, false, pointChange);
+          this.log(cleanText, false, pointChange);
         }
       }
     }

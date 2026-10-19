@@ -1,16 +1,33 @@
 export class SoundManager {
   private ambientAudio: HTMLAudioElement | null = null;
   private isMuted = false;
+  private currentAmbientTrack = 1;
+  private sfxVolume = 0.6;
+  private ambientVolume = 0.35;
 
   constructor() {
-    this.ambientAudio = new Audio('./ambient.mp3');
-    this.ambientAudio.loop = true;
-    this.ambientAudio.volume = 0.35;
+    this.initAmbient(1);
   }
 
-  public playAmbient(): void {
-    if (this.isMuted || !this.ambientAudio) return;
-    this.ambientAudio.play().catch(() => {});
+  private initAmbient(trackNum: number): void {
+    if (this.ambientAudio) {
+      this.ambientAudio.pause();
+      this.ambientAudio = null;
+    }
+    this.currentAmbientTrack = trackNum;
+    this.ambientAudio = new Audio(`./assets/audio/mu_ambient_${trackNum}.mp3`);
+    this.ambientAudio.loop = true;
+    this.ambientAudio.volume = this.ambientVolume;
+  }
+
+  public playAmbient(trackNum?: number): void {
+    if (this.isMuted) return;
+    if (trackNum && trackNum !== this.currentAmbientTrack) {
+      this.initAmbient(trackNum);
+    }
+    if (this.ambientAudio) {
+      this.ambientAudio.play().catch(() => {});
+    }
   }
 
   public pauseAmbient(): void {
@@ -19,23 +36,29 @@ export class SoundManager {
     }
   }
 
-  public playButton(): void {
-    // Subtle tactile click using web audio api
+  public playSfx(name: 'button' | 'choice' | 'inventory' | 'cards'): void {
     if (this.isMuted) return;
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(320, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 0.04);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.04);
+      const audio = new Audio(`./assets/audio/so_${name}_1.mp3`);
+      audio.volume = this.sfxVolume;
+      audio.play().catch(() => {});
     } catch (e) {}
+  }
+
+  public playButton(): void {
+    this.playSfx('button');
+  }
+
+  public playChoice(): void {
+    this.playSfx('choice');
+  }
+
+  public playInventory(): void {
+    this.playSfx('inventory');
+  }
+
+  public playCards(): void {
+    this.playSfx('cards');
   }
 
   public toggle(): boolean {
@@ -46,5 +69,9 @@ export class SoundManager {
       this.playAmbient();
     }
     return !this.isMuted;
+  }
+
+  public getMuted(): boolean {
+    return this.isMuted;
   }
 }

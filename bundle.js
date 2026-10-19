@@ -1,3 +1,7 @@
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+
 // src/storage.ts
 var STORAGE_KEY = "thefog_save_session_v2";
 var DB_NAME = "TheFogSessionDB";
@@ -128,11 +132,11 @@ function importSaveJSON(jsonStr) {
 
 // src/engine.ts
 var FogEngine = class {
-  state;
-  bundle = null;
-  onStateChange;
-  onLog;
   constructor(initialState2, onStateChange, onLog) {
+    __publicField(this, "state");
+    __publicField(this, "bundle", null);
+    __publicField(this, "onStateChange");
+    __publicField(this, "onLog");
     this.state = { ...initialState2 };
     this.onStateChange = onStateChange;
     this.onLog = onLog;
@@ -221,6 +225,12 @@ var FogEngine = class {
     if (!lines) return null;
     return lines[this.state.currentLineId] || null;
   }
+  getChoiceText(textKey) {
+    const quest = this.getCurrentQuestObj();
+    const story = this.getCurrentStoryObj();
+    const raw = quest?.texts?.[textKey]?.text || story?.texts?.[textKey]?.text || story?.texts?.ru?.[textKey]?.text || this.bundle?.all_texts?.[textKey]?.text || this.bundle?.common_texts?.[textKey]?.text || textKey;
+    return raw.replace(/<\/?(?:i|b|color[^>]*|size[^>]*)>/gi, "").trim();
+  }
   getAvailableQuests() {
     const story = this.getCurrentStoryObj();
     if (!story || !story.quests) return [];
@@ -228,12 +238,18 @@ var FogEngine = class {
     for (const [qId, qData] of Object.entries(story.quests)) {
       const nameKey = qData.name_text;
       const descKey = qData.desc_text;
-      const name = this.bundle?.common_texts?.[nameKey]?.text || story.texts?.ru?.[nameKey]?.text || qData.texts?.[nameKey]?.text || `\u041A\u0432\u0435\u0441\u0442 ${qId}`;
-      const desc = this.bundle?.common_texts?.[descKey]?.text || story.texts?.ru?.[descKey]?.text || qData.texts?.[descKey]?.text || "";
+      const name = story.texts?.[nameKey]?.text || story.texts?.ru?.[nameKey]?.text || this.bundle?.common_texts?.[nameKey]?.text || qData.texts?.[nameKey]?.text || `\u041A\u0432\u0435\u0441\u0442 ${qId}`;
+      const desc = story.texts?.[descKey]?.text || story.texts?.ru?.[descKey]?.text || this.bundle?.common_texts?.[descKey]?.text || qData.texts?.[descKey]?.text || "";
       const cards = [];
-      if (qData.cards) {
+      if (Array.isArray(qData.cards)) {
+        for (const c of qData.cards) {
+          if (typeof c === "string") cards.push(c);
+          else if (c && c.path) cards.push(c.path);
+        }
+      } else if (qData.cards) {
         for (const c of Object.values(qData.cards)) {
-          cards.push(c.path);
+          if (typeof c === "string") cards.push(c);
+          else if (c && c.path) cards.push(c.path);
         }
       }
       const questKey = `${this.state.currentEpisode}_${this.state.currentStory}_${qId}`;
@@ -407,8 +423,9 @@ var FogEngine = class {
         const questTexts = quest.texts;
         const rawText = questTexts?.[comp.text]?.text || this.bundle?.common_texts?.[comp.text]?.text;
         if (rawText) {
+          const cleanText = rawText.replace(/<\/?(?:i|b|color[^>]*|size[^>]*)>/gi, "").trim();
           const pointChange = redChange !== 0 || blueChange !== 0 ? { red: redChange, blue: blueChange } : void 0;
-          this.log(rawText, false, pointChange);
+          this.log(cleanText, false, pointChange);
         }
       }
     }
@@ -492,40 +509,60 @@ var FogEngine = class {
 
 // src/sounds.ts
 var SoundManager = class {
-  ambientAudio = null;
-  isMuted = false;
   constructor() {
-    this.ambientAudio = new Audio("./ambient.mp3");
-    this.ambientAudio.loop = true;
-    this.ambientAudio.volume = 0.35;
+    __publicField(this, "ambientAudio", null);
+    __publicField(this, "isMuted", false);
+    __publicField(this, "currentAmbientTrack", 1);
+    __publicField(this, "sfxVolume", 0.6);
+    __publicField(this, "ambientVolume", 0.35);
+    this.initAmbient(1);
   }
-  playAmbient() {
-    if (this.isMuted || !this.ambientAudio) return;
-    this.ambientAudio.play().catch(() => {
-    });
+  initAmbient(trackNum) {
+    if (this.ambientAudio) {
+      this.ambientAudio.pause();
+      this.ambientAudio = null;
+    }
+    this.currentAmbientTrack = trackNum;
+    this.ambientAudio = new Audio(`./assets/audio/mu_ambient_${trackNum}.mp3`);
+    this.ambientAudio.loop = true;
+    this.ambientAudio.volume = this.ambientVolume;
+  }
+  playAmbient(trackNum) {
+    if (this.isMuted) return;
+    if (trackNum && trackNum !== this.currentAmbientTrack) {
+      this.initAmbient(trackNum);
+    }
+    if (this.ambientAudio) {
+      this.ambientAudio.play().catch(() => {
+      });
+    }
   }
   pauseAmbient() {
     if (this.ambientAudio) {
       this.ambientAudio.pause();
     }
   }
-  playButton() {
+  playSfx(name) {
     if (this.isMuted) return;
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(320, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 0.04);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(1e-3, ctx.currentTime + 0.04);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.04);
+      const audio = new Audio(`./assets/audio/so_${name}_1.mp3`);
+      audio.volume = this.sfxVolume;
+      audio.play().catch(() => {
+      });
     } catch (e) {
     }
+  }
+  playButton() {
+    this.playSfx("button");
+  }
+  playChoice() {
+    this.playSfx("choice");
+  }
+  playInventory() {
+    this.playSfx("inventory");
+  }
+  playCards() {
+    this.playSfx("cards");
   }
   toggle() {
     this.isMuted = !this.isMuted;
@@ -535,6 +572,9 @@ var SoundManager = class {
       this.playAmbient();
     }
     return !this.isMuted;
+  }
+  getMuted() {
+    return this.isMuted;
   }
 };
 
@@ -611,11 +651,25 @@ function updateView(state) {
     renderQuest(state);
   }
 }
+var lastBackgroundPath = "";
+var peekTimeout = null;
 function updateBackground(bgPath) {
   if (!bgPath) return;
   const clean = bgPath.replace(/^Backgrounds\//, "").replace(/\.(png|jpg|webp)$/i, "");
   const url = `./assets/backgrounds/${clean}.webp`;
-  gameBg.style.backgroundImage = `url('${url}')`;
+  if (bgPath !== lastBackgroundPath) {
+    lastBackgroundPath = bgPath;
+    gameBg.style.backgroundImage = `url('${url}')`;
+    triggerTemporaryPeek(2e3);
+  }
+}
+function triggerTemporaryPeek(durationMs = 2e3) {
+  document.body.classList.add("peeking");
+  if (peekTimeout) clearTimeout(peekTimeout);
+  peekTimeout = setTimeout(() => {
+    document.body.classList.remove("peeking");
+    peekTimeout = null;
+  }, durationMs);
 }
 function updatePoints(state) {
   if (pointsRedVal) pointsRedVal.textContent = String(state.points.value_0 || 0);
@@ -641,9 +695,17 @@ function renderHub(state) {
   hubCardStatus.style.color = currentQ.isDone ? "var(--color-fog-muted)" : "var(--color-fog-gold)";
   let cardImgPath = "./assets/backgrounds/1.webp";
   if (currentQ.cards && currentQ.cards.length > 0) {
-    const rawCard = currentQ.cards[0].replace(/^Cards\//, "").replace(/\.(png|jpg|webp)$/i, "");
-    cardImgPath = `./assets/cards/${rawCard}.webp`;
+    const rawCard = String(currentQ.cards[0]).replace(/\\/g, "/").split("/").pop()?.replace(/\.(png|jpg|webp)$/i, "") || "";
+    if (rawCard) {
+      cardImgPath = `./assets/cards/${rawCard}.webp`;
+    }
+  } else if (state.currentBackground) {
+    const cleanBg = String(state.currentBackground).replace(/\\/g, "/").split("/").pop()?.replace(/\.(png|jpg|webp)$/i, "") || "1";
+    cardImgPath = `./assets/backgrounds/${cleanBg}.webp`;
   }
+  hubCardImg.onerror = () => {
+    hubCardImg.src = "./assets/backgrounds/1.webp";
+  };
   hubCardImg.src = cardImgPath;
   hubBtnPrev.disabled = currentCarouselIndex === 0;
   hubBtnNext.disabled = currentCarouselIndex >= hubQuestsList.length - 1;
@@ -674,11 +736,10 @@ function renderQuest(state) {
     for (const [key, item] of Object.entries(choiceComp.items)) {
       const choiceBtn = document.createElement("button");
       choiceBtn.className = "fog-choice-btn animate-fade-in";
-      const commonRu = engine.getCommonRu();
-      const choiceText = commonRu[item.text]?.text || item.text || `\u0412\u0430\u0440\u0438\u0430\u043D\u0442 ${key}`;
+      const choiceText = engine.getChoiceText(item.text) || `\u0412\u0430\u0440\u0438\u0430\u043D\u0442 ${key}`;
       choiceBtn.textContent = choiceText;
       choiceBtn.addEventListener("click", () => {
-        sounds.playButton();
+        sounds.playChoice();
         engine.choose(item.line, choiceText);
       });
       controlsContainer.appendChild(choiceBtn);
@@ -703,21 +764,22 @@ function appendLogMessage(text, isChoice = false, pointChange) {
   const container = document.createElement("div");
   container.className = isChoice ? "story-choice-echo animate-fade-in" : "story-line animate-fade-in";
   container.textContent = text;
-  if (pointChange) {
+  if (pointChange && (pointChange.red || pointChange.blue)) {
+    const badgesRow = document.createElement("div");
+    badgesRow.className = "point-badges-row";
     if (pointChange.red) {
       const r = document.createElement("span");
       r.className = "point-badge-change red";
-      r.textContent = `${pointChange.red > 0 ? "+" : ""}${pointChange.red} \u0421\u0438\u043B\u0430`;
-      container.appendChild(document.createElement("br"));
-      container.appendChild(r);
+      r.textContent = `${pointChange.red > 0 ? "+" : ""}${pointChange.red}`;
+      badgesRow.appendChild(r);
     }
     if (pointChange.blue) {
       const b = document.createElement("span");
       b.className = "point-badge-change blue";
-      b.textContent = `${pointChange.blue > 0 ? "+" : ""}${pointChange.blue} \u0420\u0430\u0441\u0441\u0443\u0434\u043E\u043A`;
-      container.appendChild(document.createElement("br"));
-      container.appendChild(b);
+      b.textContent = `${pointChange.blue > 0 ? "+" : ""}${pointChange.blue}`;
+      badgesRow.appendChild(b);
     }
+    container.appendChild(badgesRow);
   }
   logContainer.appendChild(container);
   window.scrollTo({
@@ -740,14 +802,14 @@ menuBtnSettings.addEventListener("click", () => {
   modalSettings.style.display = "flex";
 });
 hubBtnPrev.addEventListener("click", () => {
-  sounds.playButton();
+  sounds.playCards();
   if (currentCarouselIndex > 0) {
     currentCarouselIndex--;
     renderHub(engine.getState());
   }
 });
 hubBtnNext.addEventListener("click", () => {
-  sounds.playButton();
+  sounds.playCards();
   if (currentCarouselIndex < hubQuestsList.length - 1) {
     currentCarouselIndex++;
     renderHub(engine.getState());
@@ -782,7 +844,7 @@ var toggleSound = () => {
 hubBtnSound.addEventListener("click", toggleSound);
 questBtnSound.addEventListener("click", toggleSound);
 var openInventory = () => {
-  sounds.playButton();
+  sounds.playInventory();
   renderInventory();
   modalInventory.style.display = "flex";
 };
@@ -861,4 +923,27 @@ btnRestart.addEventListener("click", () => {
     engine.restartGame();
   }
 });
-//# sourceMappingURL=bundle.js.map
+var isPressing = false;
+var startPeek = () => {
+  isPressing = true;
+  if (peekTimeout) {
+    clearTimeout(peekTimeout);
+    peekTimeout = null;
+  }
+  document.body.classList.add("peeking");
+};
+var stopPeek = () => {
+  if (!isPressing) return;
+  isPressing = false;
+  document.body.classList.remove("peeking");
+};
+logContainer.addEventListener("mousedown", startPeek);
+logContainer.addEventListener("mouseup", stopPeek);
+logContainer.addEventListener("mouseleave", stopPeek);
+logContainer.addEventListener("touchstart", (e) => {
+  const target = e.target;
+  if (target && target.closest("button, a, input")) return;
+  startPeek();
+}, { passive: true });
+logContainer.addEventListener("touchend", stopPeek);
+logContainer.addEventListener("touchcancel", stopPeek);
