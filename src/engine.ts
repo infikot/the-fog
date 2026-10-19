@@ -114,6 +114,19 @@ export class FogEngine {
     return lines[this.state.currentLineId] || null;
   }
 
+  public getChoiceText(textKey: string): string {
+    const quest = this.getCurrentQuestObj();
+    const story = this.getCurrentStoryObj();
+    return (
+      quest?.texts?.[textKey]?.text ||
+      story?.texts?.[textKey]?.text ||
+      story?.texts?.ru?.[textKey]?.text ||
+      this.bundle?.all_texts?.[textKey]?.text ||
+      this.bundle?.common_texts?.[textKey]?.text ||
+      textKey
+    );
+  }
+
   public getAvailableQuests(): Array<{ id: string; name: string; desc: string; cards: string[]; isDone: boolean }> {
     const story = this.getCurrentStoryObj();
     if (!story || !story.quests) return [];
@@ -122,12 +135,18 @@ export class FogEngine {
     for (const [qId, qData] of Object.entries(story.quests as Record<string, any>)) {
       const nameKey = qData.name_text;
       const descKey = qData.desc_text;
-      const name = this.bundle?.common_texts?.[nameKey]?.text || story.texts?.ru?.[nameKey]?.text || qData.texts?.[nameKey]?.text || `Квест ${qId}`;
-      const desc = this.bundle?.common_texts?.[descKey]?.text || story.texts?.ru?.[descKey]?.text || qData.texts?.[descKey]?.text || '';
+      const name = story.texts?.[nameKey]?.text || story.texts?.ru?.[nameKey]?.text || this.bundle?.common_texts?.[nameKey]?.text || qData.texts?.[nameKey]?.text || `Квест ${qId}`;
+      const desc = story.texts?.[descKey]?.text || story.texts?.ru?.[descKey]?.text || this.bundle?.common_texts?.[descKey]?.text || qData.texts?.[descKey]?.text || '';
       const cards: string[] = [];
-      if (qData.cards) {
+      if (Array.isArray(qData.cards)) {
+        for (const c of qData.cards) {
+          if (typeof c === 'string') cards.push(c);
+          else if (c && c.path) cards.push(c.path);
+        }
+      } else if (qData.cards) {
         for (const c of Object.values(qData.cards as Record<string, any>)) {
-          cards.push(c.path);
+          if (typeof c === 'string') cards.push(c);
+          else if (c && c.path) cards.push(c.path);
         }
       }
       const questKey = `${this.state.currentEpisode}_${this.state.currentStory}_${qId}`;

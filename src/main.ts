@@ -138,12 +138,20 @@ function renderHub(state: GameState): void {
   hubCardStatus.textContent = currentQ.isDone ? 'Исследовано' : 'Доступно';
   hubCardStatus.style.color = currentQ.isDone ? 'var(--color-fog-muted)' : 'var(--color-fog-gold)';
 
-  // First card image or default
+  // First card image or fallback
   let cardImgPath = './assets/backgrounds/1.webp';
   if (currentQ.cards && currentQ.cards.length > 0) {
-    const rawCard = currentQ.cards[0].replace(/^Cards\//, '').replace(/\.(png|jpg|webp)$/i, '');
-    cardImgPath = `./assets/cards/${rawCard}.webp`;
+    const rawCard = String(currentQ.cards[0]).replace(/\\/g, '/').split('/').pop()?.replace(/\.(png|jpg|webp)$/i, '') || '';
+    if (rawCard) {
+      cardImgPath = `./assets/cards/${rawCard}.webp`;
+    }
+  } else if (state.currentBackground) {
+    const cleanBg = String(state.currentBackground).replace(/\\/g, '/').split('/').pop()?.replace(/\.(png|jpg|webp)$/i, '') || '1';
+    cardImgPath = `./assets/backgrounds/${cleanBg}.webp`;
   }
+  hubCardImg.onerror = () => {
+    hubCardImg.src = './assets/backgrounds/1.webp';
+  };
   hubCardImg.src = cardImgPath;
 
   // Nav buttons
@@ -187,8 +195,7 @@ function renderQuest(state: GameState): void {
     for (const [key, item] of Object.entries(choiceComp.items)) {
       const choiceBtn = document.createElement('button');
       choiceBtn.className = 'fog-choice-btn animate-fade-in';
-      const commonRu = engine.getCommonRu();
-      const choiceText = commonRu[item.text]?.text || item.text || `Вариант ${key}`;
+      const choiceText = engine.getChoiceText(item.text) || `Вариант ${key}`;
       choiceBtn.textContent = choiceText;
 
       choiceBtn.addEventListener('click', () => {
