@@ -42,6 +42,7 @@ const sfxValText = document.getElementById('val-sfx')!;
 const ambientValText = document.getElementById('val-ambient')!;
 const btnExport = document.getElementById('btn-export')!;
 const btnImport = document.getElementById('btn-import')!;
+const btnModalMenu = document.getElementById('btn-modal-menu')!;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const btnRestart = document.getElementById('btn-restart')!;
 
@@ -313,6 +314,12 @@ questBtnSound.addEventListener('click', () => {
 questBtnMenu.addEventListener('click', () => {
   sounds.playButton();
   modalSettings.style.display = 'flex';
+});
+
+btnModalMenu.addEventListener('click', () => {
+  sounds.playButton();
+  modalSettings.style.display = 'none';
+  engine.returnToMenu();
 });
 
 btnSettingsMenu.addEventListener('click', () => {
