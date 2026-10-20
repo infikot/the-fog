@@ -10,39 +10,38 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./bundle.css" />
   </head>
-  <body class="bg-fog-dark text-fog-text select-none antialiased">
+  <body>
     <!-- Atmospheric Ambient Background Layer -->
     <div id="game-bg" class="fog-bg-layer"></div>
     <div class="fog-vignette-layer"></div>
+    <div class="fog-mist"></div>
 
     <!-- ======================================================== -->
     <!-- SCREEN 1: MAIN MENU (Cinematic Start)                    -->
     <!-- ======================================================== -->
-    <section id="screen-menu" class="fog-screen flex-col items-center justify-between p-6 z-20">
-      <div class="w-full flex justify-end pt-2">
+    <section id="screen-menu">
+      <div style="position:absolute;top:1rem;right:1rem;">
         <button id="menu-btn-sound" class="fog-btn-icon" title="Звук">
           <span class="material-symbols-outlined" id="menu-sound-icon">volume_up</span>
         </button>
       </div>
 
-      <div class="flex flex-col items-center text-center my-auto">
-        <h1 class="fog-title animate-glow">ТУМАН</h1>
-        <p class="fog-subtitle">Текстовая интерактивная новелла</p>
+      <div class="menu-title-block">
+        <h1 class="menu-game-title">ТУМАН</h1>
+        <p class="menu-game-subtitle">Текстовая интерактивная новелла</p>
       </div>
 
-      <div class="w-full max-w-xs flex flex-col gap-3 pb-8">
-        <button id="menu-btn-continue" class="fog-btn-primary" style="display:none;">
+      <div class="menu-buttons-list">
+        <button id="menu-btn-continue" class="btn-menu-action primary" style="display:none;">
           <span>Продолжить</span>
-          <span class="material-symbols-outlined">play_arrow</span>
         </button>
-        <button id="menu-btn-start" class="fog-btn-action">
+        <button id="menu-btn-start" class="btn-menu-action primary">
           <span>Новая игра</span>
-          <span class="material-symbols-outlined">explore</span>
         </button>
-        <button id="menu-btn-settings" class="fog-btn-secondary">
-          <span>Настройки и звук</span>
-          <span class="material-symbols-outlined">settings</span>
+        <button id="menu-btn-settings" class="btn-menu-action">
+          <span>Настройки</span>
         </button>
       </div>
     </section>
@@ -50,53 +49,53 @@
     <!-- ======================================================== -->
     <!-- SCREEN 2: STORY & LOCATION CAROUSEL (Original Hub)       -->
     <!-- ======================================================== -->
-    <section id="screen-hub" class="fog-screen flex-col justify-between p-4 z-20" style="display:none;">
+    <section id="screen-hub" style="display:none;">
       <!-- Hub Header -->
-      <div class="w-full flex justify-between items-center py-2 px-1">
+      <div class="hub-header">
         <div>
-          <div id="hub-ep-title" class="text-xs uppercase tracking-widest text-fog-gold font-serif">НАЗАРЕТ</div>
-          <div id="hub-story-title" class="text-sm font-semibold text-fog-text">Глава 0</div>
+          <div id="hub-ep-title" class="hub-episode-title">НАЗАРЕТ</div>
+          <div id="hub-story-title" class="hub-story-subtitle">Глава 0</div>
         </div>
-        <div class="flex items-center gap-2">
+        <div>
           <button id="hub-btn-settings" class="fog-btn-icon" title="Настройки">
             <span class="material-symbols-outlined">settings</span>
           </button>
         </div>
       </div>
 
-      <!-- Center Card Carousel with Arrows -->
-      <div class="flex-1 flex flex-col items-center justify-center my-2 max-w-sm mx-auto w-full">
-        <div class="relative w-full aspect-[4/5] max-h-[50vh] flex items-center justify-center">
-          <button id="btn-prev-quest" class="carousel-arrow left-0" title="Назад">‹</button>
-          
-          <div id="card-container" class="w-full h-full p-2 flex items-center justify-center">
+      <!-- Center Card Carousel -->
+      <div class="hub-carousel-wrap">
+        <div class="hub-card-box">
+          <div class="hub-card-image-wrap" id="card-container">
             <!-- Dynamic Quest Card Image -->
           </div>
-
-          <button id="btn-next-quest" class="carousel-arrow right-0" title="Вперёд">›</button>
+          <div class="hub-card-info">
+            <div id="quest-name" class="hub-card-title">Вступление</div>
+            <div id="quest-desc" class="hub-card-desc"></div>
+            
+            <div class="hub-card-nav-row">
+              <button id="btn-prev-quest" class="btn-hub-arrow" title="Назад">‹</button>
+              <div id="hub-action-container" style="flex:1;">
+                <!-- Injected start quest button -->
+              </div>
+              <button id="btn-next-quest" class="btn-hub-arrow" title="Вперёд">›</button>
+            </div>
+          </div>
         </div>
-
-        <div class="text-center mt-3 px-4">
-          <div id="quest-name" class="font-serif text-lg font-bold text-fog-gold tracking-wide">Вступление</div>
-          <div id="quest-desc" class="text-xs text-fog-muted mt-1 leading-relaxed line-clamp-3"></div>
-        </div>
-      </div>
-
-      <!-- Hub Action Button -->
-      <div class="w-full max-w-sm mx-auto pb-4" id="hub-action-container">
-        <!-- Injected button -->
       </div>
     </section>
 
     <!-- ======================================================== -->
     <!-- SCREEN 3: QUEST STORYPLAY (Chat & Choices)               -->
     <!-- ======================================================== -->
-    <section id="screen-quest" class="fog-screen flex-col z-20" style="display:none;">
+    <section id="screen-quest" style="display:none;">
       <!-- Floating Top Bar -->
       <header class="fog-header">
-        <button id="quest-btn-menu" class="fog-menu-label" title="Меню">
-          МЕНЮ
-        </button>
+        <div class="fog-header-left">
+          <button id="quest-btn-menu" class="btn-header-back" title="Меню">
+            МЕНЮ
+          </button>
+        </div>
 
         <!-- Morality Points: Clean Raw Numbers Without Boxes -->
         <div class="fog-points-bar">
@@ -196,7 +195,6 @@
       </div>
     </div>
 
-    <link rel="stylesheet" href="./bundle.css" />
     <script type="module" src="./bundle.js"></script>
   </body>
 </html>
